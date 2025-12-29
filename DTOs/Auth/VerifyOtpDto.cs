@@ -2,12 +2,15 @@
 
 namespace ShopNetApi.DTOs.Auth
 {
-    public class RegisterDto
+    public class VerifyOtpDto
     {
         [Required]
-        [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
         public string Email { get; set; } = null!;
+
         [Required]
-        public string? FullName { get; set; }
+        public string Otp { get; set; } = null!;
+
+        [Required]
+        public string Password { get; set; } = null!;
     }
 }

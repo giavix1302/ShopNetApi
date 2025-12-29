@@ -11,6 +11,7 @@ namespace ShopNetApi.Data
             : base(options)
         {
         }
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<Product> Products => Set<Product>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Brand> Brands => Set<Brand>();

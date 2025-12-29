@@ -6,6 +6,10 @@ using Microsoft.IdentityModel.Tokens;
 using ShopNetApi.Data;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Models;
+using ShopNetApi.Services;
+using ShopNetApi.Services.Interfaces;
+using ShopNetApi.Settings;
+using StackExchange.Redis;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -68,7 +72,9 @@ builder.Services.Configure<IdentityOptions>(options =>
 });
 
 // ===================== JWT =====================
-// (thêm khi làm auth)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
 var jwtConfig = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtConfig["Key"]!);
 
@@ -96,6 +102,22 @@ builder.Services.AddAuthorization();
 
 // ===================== AutoMapper =====================
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+// ===================== REDIS + SMTP =====================
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect(
+        builder.Configuration["Redis:ConnectionString"]!
+    )
+);
+
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("Smtp")
+);
+
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<OtpService>();
+
+builder.Services.AddScoped<RefreshTokenService>();
 
 var app = builder.Build();
 
