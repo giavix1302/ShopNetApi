@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using ShopNetApi.DTOs.Auth;
 using ShopNetApi.DTOs.Common;
@@ -33,6 +34,7 @@ namespace ShopNetApi.Controllers
             _authService = authService;
         }
 
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
@@ -59,7 +61,7 @@ namespace ShopNetApi.Controllers
             );
         }
 
-
+        [AllowAnonymous]
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
@@ -85,6 +87,7 @@ namespace ShopNetApi.Controllers
             );
         }
 
+        [AllowAnonymous]
         [HttpPost("verify-register-otp")]
         public async Task<IActionResult> VerifyRegisterOtp(VerifyOtpDto dto)
         {
@@ -123,6 +126,7 @@ namespace ShopNetApi.Controllers
             );
         }
 
+        [AllowAnonymous]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
@@ -142,6 +146,7 @@ namespace ShopNetApi.Controllers
             }));
         }
 
+        [Authorize]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {

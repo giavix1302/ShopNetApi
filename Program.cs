@@ -119,6 +119,12 @@ builder.Services.AddScoped<OtpService>();
 
 builder.Services.AddScoped<RefreshTokenService>();
 
+// ===================== Category =====================
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+
+// ===================== Brand =====================
+builder.Services.AddScoped<IBrandService, BrandService>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

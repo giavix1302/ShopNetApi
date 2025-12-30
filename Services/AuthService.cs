@@ -133,7 +133,10 @@ namespace ShopNetApi.Services
             tokenEntity.IsRevoked = true;
             await _db.SaveChangesAsync();
 
-            var user = await _userManager.FindByIdAsync(userId.ToString());
+            var user = userId.HasValue
+                ? await _userManager.FindByIdAsync(userId.Value.ToString())
+                : null;
+
             if (user == null) return null;
 
             return await SignInAsync(user); // trả accessToken mới
