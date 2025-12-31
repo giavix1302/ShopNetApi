@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ShopNetApi.DTOs.Category;
+using ShopNetApi.Exceptions;
 using ShopNetApi.Models;
 using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services.Interfaces;
@@ -15,14 +16,11 @@ namespace ShopNetApi.Services
             _categoryRepo = categoryRepo;
         }
 
+        // ================= CREATE =================
         public async Task<CategoryResponseDto> CreateAsync(CreateCategoryDto dto)
         {
-            // Check if category with the same name already exists
-            var existingCategory = await _db.Categories
-                .AnyAsync(c => c.Name.ToLower() == dto.Name.ToLower());
-
-            if (existingCategory)
-                throw new Exception("Category name already exists");
+            if (await _categoryRepo.ExistsByNameAsync(dto.Name))
+                throw new BadRequestException("Category name already exists");
 
             var category = new Category
             {
@@ -30,70 +28,67 @@ namespace ShopNetApi.Services
                 Description = dto.Description
             };
 
-            _db.Categories.Add(category);
-            await _db.SaveChangesAsync();
+            await _categoryRepo.AddAsync(category);
 
-            return new CategoryResponseDto
-            {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                CreatedAt = category.CreatedAt
-            };
+            return MapToResponse(category);
         }
 
+        // ================= UPDATE =================
         public async Task<CategoryResponseDto> UpdateAsync(long id, UpdateCategoryDto dto)
         {
-            var category = await _db.Categories
-                .FirstOrDefaultAsync(x => x.Id == id);
-
+            var category = await _categoryRepo.GetByIdAsync(id);
             if (category == null)
-                throw new Exception("Category not found");
+                throw new NotFoundException("Category not found");
 
-            // Check trùng tên (ngoại trừ chính nó)
-            var nameExists = await _db.Categories.AnyAsync(x =>
-                x.Id != id &&
-                x.Name.ToLower() == dto.Name.ToLower());
-
-            if (nameExists)
-                throw new Exception("Category name already exists");
+            if (await _categoryRepo.ExistsByNameAsync(dto.Name, id))
+                throw new BadRequestException("Category name already exists");
 
             category.Name = dto.Name;
             category.Description = dto.Description;
 
-            await _db.SaveChangesAsync();
+            await _categoryRepo.UpdateAsync(category);
 
-            return new CategoryResponseDto
-            {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                CreatedAt = category.CreatedAt
-            };
+            return MapToResponse(category);
         }
 
+        // ================= GET ALL =================
         public async Task<List<CategoryResponseDto>> GetAllAsync()
         {
-            return await _db.Categories
-                .OrderByDescending(x => x.CreatedAt)
-                .Select(x => new CategoryResponseDto
-                {
-                    Id = x.Id,
-                    Name = x.Name,
-                    Description = x.Description,
-                    CreatedAt = x.CreatedAt
-                })
-                .ToListAsync();
+            var categories = await _categoryRepo.GetAllAsync();
+
+            return categories
+                .Select(MapToResponse)
+                .ToList();
         }
 
+        // ================= GET BY ID =================
         public async Task<CategoryResponseDto> GetByIdAsync(long id)
         {
-            var category = await _db.Categories
-                .FirstOrDefaultAsync(x => x.Id == id);
-
+            var category = await _categoryRepo.GetByIdAsync(id);
             if (category == null)
-                throw new Exception("Category not found");
+                throw new NotFoundException("Category not found");
 
+            return MapToResponse(category);
+        }
+
+        // ================= DELETE =================
+        public async Task DeleteAsync(long id)
+        {
+            var category = await _categoryRepo.GetByIdWithProductsAsync(id);
+            if (category == null)
+                throw new NotFoundException("Category not found");
+
+            if (category.Products.Any())
+                throw new BadRequestException(
+                    "Cannot delete category with existing products"
+                );
+
+            await _categoryRepo.DeleteAsync(category);
+        }
+
+        // ================= MAPPER =================
+        private static CategoryResponseDto MapToResponse(Category category)
+        {
             return new CategoryResponseDto
             {
                 Id = category.Id,
@@ -101,22 +96,6 @@ namespace ShopNetApi.Services
                 Description = category.Description,
                 CreatedAt = category.CreatedAt
             };
-        }
-
-        public async Task DeleteAsync(long id)
-        {
-            var category = await _db.Categories
-                .Include(x => x.Products)
-                .FirstOrDefaultAsync(x => x.Id == id);
-
-            if (category == null)
-                throw new Exception("Category not found");
-
-            if (category.Products.Any())
-                throw new Exception("Cannot delete category with existing products");
-
-            _db.Categories.Remove(category);
-            await _db.SaveChangesAsync();
         }
 
     }

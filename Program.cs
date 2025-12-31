@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ShopNetApi.Data;
 using ShopNetApi.DTOs.Common;
+using ShopNetApi.Middlewares;
 using ShopNetApi.Models;
 using ShopNetApi.Repositories;
 using ShopNetApi.Repositories.Interfaces;
@@ -153,6 +154,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 

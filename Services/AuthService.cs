@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using ShopNetApi.DTOs.Auth;
+using ShopNetApi.Exceptions;
 using ShopNetApi.Models;
 using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services.Interfaces;
@@ -14,27 +16,82 @@ namespace ShopNetApi.Services
 
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _config;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IHttpContextAccessor _http;
         private readonly RefreshTokenService _refreshTokenService;
         private readonly IRefreshTokenRepository _refreshTokenRepo;
+        private readonly OtpService _otpService;
+        private readonly EmailService _emailService;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             IConfiguration config,
-            IHttpContextAccessor httpContextAccessor,
+            IHttpContextAccessor http,
             RefreshTokenService refreshTokenService,
-            IRefreshTokenRepository refreshTokenRepo)
+            IRefreshTokenRepository refreshTokenRepo,
+            OtpService otpService,
+            EmailService emailService)
         {
             _userManager = userManager;
             _config = config;
-            _httpContextAccessor = httpContextAccessor;
+            _http = http;
             _refreshTokenService = refreshTokenService;
             _refreshTokenRepo = refreshTokenRepo;
+            _otpService = otpService;
+            _emailService = emailService;
         }
 
-        public async Task<string> SignInAsync(ApplicationUser user)
+        public async Task<string> LoginAsync(LoginDto dto)
         {
-            // ===== CLAIMS =====
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+
+            if (user == null || !user.Enabled)
+                throw new UnauthorizedException("Invalid credentials");
+
+            if (!await _userManager.CheckPasswordAsync(user, dto.Password))
+                throw new UnauthorizedException("Invalid credentials");
+
+            return await SignInAsync(user);
+        }
+
+        // ================= REGISTER =================
+        public async Task RegisterAsync(RegisterDto dto)
+        {
+            var existing = await _userManager.FindByEmailAsync(dto.Email);
+            if (existing != null)
+                throw new BadRequestException("Email đã tồn tại");
+
+            var otp = await _otpService.GenerateAndStoreAsync(dto.Email, dto.FullName!);
+            await _emailService.SendOtpAsync(dto.Email, otp);
+        }
+
+        // ================= VERIFY OTP =================
+        public async Task<string> VerifyRegisterOtpAsync(VerifyOtpDto dto)
+        {
+            var otpResult = await _otpService.VerifyAsync(dto.Email, dto.Otp);
+            if (otpResult == null)
+                throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
+
+            var user = new ApplicationUser
+            {
+                Email = otpResult.Email,
+                UserName = otpResult.Email,
+                FullName = otpResult.FullName,
+                Enabled = true,
+                EmailConfirmed = true
+            };
+
+            var result = await _userManager.CreateAsync(user, dto.Password);
+            if (!result.Succeeded)
+                throw new BadRequestException("Đăng ký thất bại");
+
+            await _userManager.AddToRoleAsync(user, "User");
+
+            return await SignInAsync(user);
+        }
+
+        // ================= SIGN IN =================
+        private async Task<string> SignInAsync(ApplicationUser user)
+        {
             var roles = await _userManager.GetRolesAsync(user);
 
             var claims = new List<Claim>
@@ -43,66 +100,52 @@ namespace ShopNetApi.Services
                 new Claim(ClaimTypes.Name, user.FullName ?? user.UserName!)
             };
 
-            foreach (var role in roles)
-                claims.Add(new Claim(ClaimTypes.Role, role));
+            foreach (var r in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, r));
+            }
 
-            // ===== ACCESS TOKEN =====
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_config["Jwt:Key"]!)
             );
 
-            var accessToken = new JwtSecurityToken(
+            var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
                 expires: DateTime.UtcNow.AddMinutes(15),
-                signingCredentials: new SigningCredentials(
-                    key, SecurityAlgorithms.HmacSha256)
+                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
             );
 
-            var accessTokenString =
-                new JwtSecurityTokenHandler().WriteToken(accessToken);
+            var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
 
-            // ===== REFRESH TOKEN =====
+            // refresh token
             var refreshToken = _refreshTokenService.GenerateRefreshToken();
-            var refreshTokenHash = BCrypt.Net.BCrypt.HashPassword(refreshToken);
+            var hash = BCrypt.Net.BCrypt.HashPassword(refreshToken);
 
-            // ===== DB =====
-            var refreshTokenEntity = new RefreshToken
+            await _refreshTokenRepo.AddAsync(new RefreshToken
             {
                 UserId = user.Id,
-                TokenHash = refreshTokenHash,
+                TokenHash = hash,
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddDays(7),
-                IsRevoked = false,
-                IpAddress = _httpContextAccessor.HttpContext?
-                    .Connection.RemoteIpAddress?.ToString()
-            };
+                IpAddress = _http.HttpContext?.Connection.RemoteIpAddress?.ToString()
+            });
 
-            await _refreshTokenRepo.AddAsync(refreshTokenEntity);
+            await _refreshTokenService.SaveAsync(refreshToken, user.Id, TimeSpan.FromDays(7));
+            SetCookie(refreshToken);
 
-            // ===== REDIS =====
-            await _refreshTokenService.SaveAsync(
-                refreshToken,
-                user.Id,
-                TimeSpan.FromDays(7)
-            );
-
-            // ===== COOKIE =====
-            SetTokenCookie("refreshToken", refreshToken, 7 * 24 * 60);
-            return accessTokenString;
+            return accessToken;
         }
 
-        private void SetTokenCookie(string name, string value, int expireMinutes)
+        private void SetCookie(string token)
         {
-            var response = _httpContextAccessor.HttpContext!.Response;
-
-            response.Cookies.Append(name, value, new CookieOptions
+            _http.HttpContext!.Response.Cookies.Append("refreshToken", token, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddMinutes(expireMinutes)
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
         }
 

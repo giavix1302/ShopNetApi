@@ -1,7 +1,5 @@
-﻿
-
-using Microsoft.EntityFrameworkCore;
-using ShopNetApi.DTOs.Brand;
+﻿using ShopNetApi.DTOs.Brand;
+using ShopNetApi.Exceptions;
 using ShopNetApi.Models;
 using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services.Interfaces;
@@ -17,10 +15,11 @@ namespace ShopNetApi.Services
             _brandRepo = brandRepo;
         }
 
+        // ================= CREATE =================
         public async Task<BrandResponseDto> CreateAsync(CreateBrandDto dto)
         {
             if (await _brandRepo.ExistsByNameAsync(dto.Name))
-                throw new Exception("Brand name already exists");
+                throw new BadRequestException("Brand name already exists");
 
             var brand = new Brand
             {
@@ -38,10 +37,10 @@ namespace ShopNetApi.Services
         {
             var brand = await _brandRepo.GetByIdAsync(id);
             if (brand == null)
-                throw new Exception("Brand not found");
+                throw new NotFoundException("Brand not found");
 
             if (await _brandRepo.ExistsByNameAsync(dto.Name, id))
-                throw new Exception("Brand name already exists");
+                throw new BadRequestException("Brand name already exists");
 
             brand.Name = dto.Name;
             brand.Description = dto.Description;
@@ -56,10 +55,12 @@ namespace ShopNetApi.Services
         {
             var brand = await _brandRepo.GetByIdWithProductsAsync(id);
             if (brand == null)
-                throw new Exception("Brand not found");
+                throw new NotFoundException("Brand not found");
 
             if (brand.Products.Any())
-                throw new Exception("Cannot delete brand with existing products");
+                throw new BadRequestException(
+                    "Cannot delete brand with existing products"
+                );
 
             await _brandRepo.DeleteAsync(brand);
         }
@@ -76,7 +77,7 @@ namespace ShopNetApi.Services
         {
             var brand = await _brandRepo.GetByIdAsync(id);
             if (brand == null)
-                throw new Exception("Brand not found");
+                throw new NotFoundException("Brand not found");
 
             return MapToResponse(brand);
         }

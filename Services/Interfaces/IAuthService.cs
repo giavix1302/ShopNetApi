@@ -1,14 +1,13 @@
-﻿using ShopNetApi.Models;
+﻿using ShopNetApi.DTOs.Auth;
 
 namespace ShopNetApi.Services.Interfaces
 {
     public interface IAuthService
     {
-        Task<string> SignInAsync(ApplicationUser user);
-
+        Task<string> LoginAsync(LoginDto dto);
+        Task RegisterAsync(RegisterDto dto);
+        Task<string> VerifyRegisterOtpAsync(VerifyOtpDto dto);
         Task<string?> RefreshAsync(string refreshToken);
-
         Task LogoutAsync(string refreshToken);
-
     }
 }
