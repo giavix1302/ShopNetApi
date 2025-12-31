@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using ShopNetApi.Data;
 using ShopNetApi.Models;
+using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,20 +16,20 @@ namespace ShopNetApi.Services
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly RefreshTokenService _refreshTokenService;
-        private readonly ApplicationDbContext _db;
+        private readonly IRefreshTokenRepository _refreshTokenRepo;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             IConfiguration config,
             IHttpContextAccessor httpContextAccessor,
             RefreshTokenService refreshTokenService,
-            ApplicationDbContext db)
+            IRefreshTokenRepository refreshTokenRepo)
         {
             _userManager = userManager;
             _config = config;
             _httpContextAccessor = httpContextAccessor;
             _refreshTokenService = refreshTokenService;
-            _db = db;
+            _refreshTokenRepo = refreshTokenRepo;
         }
 
         public async Task<string> SignInAsync(ApplicationUser user)
@@ -80,8 +79,7 @@ namespace ShopNetApi.Services
                     .Connection.RemoteIpAddress?.ToString()
             };
 
-            _db.RefreshTokens.Add(refreshTokenEntity);
-            await _db.SaveChangesAsync();
+            await _refreshTokenRepo.AddAsync(refreshTokenEntity);
 
             // ===== REDIS =====
             await _refreshTokenService.SaveAsync(
@@ -116,13 +114,7 @@ namespace ShopNetApi.Services
             if (userId == null)
                 return null;
 
-            var tokenEntity = await _db.RefreshTokens
-                .Where(x =>
-                    x.UserId == userId &&
-                    !x.IsRevoked &&
-                    x.ExpiresAt > DateTime.UtcNow)
-                .OrderByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync();
+            var tokenEntity = await _refreshTokenRepo.GetLatestValidAsync(userId.Value);
 
             if (tokenEntity == null)
                 return null;
@@ -130,8 +122,7 @@ namespace ShopNetApi.Services
             if (!BCrypt.Net.BCrypt.Verify(refreshToken, tokenEntity.TokenHash))
                 return null;
 
-            tokenEntity.IsRevoked = true;
-            await _db.SaveChangesAsync();
+            await _refreshTokenRepo.RevokeAsync(tokenEntity);
 
             var user = userId.HasValue
                 ? await _userManager.FindByIdAsync(userId.Value.ToString())
@@ -148,18 +139,11 @@ namespace ShopNetApi.Services
             if (userId == null)
                 return;
 
-            var tokenEntity = await _db.RefreshTokens
-                .Where(x =>
-                    x.UserId == userId &&
-                    !x.IsRevoked &&
-                    x.ExpiresAt > DateTime.UtcNow)
-                .OrderByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync();
+            var tokenEntity = await _refreshTokenRepo.GetLatestValidAsync(userId.Value);
 
             if (tokenEntity != null)
             {
-                tokenEntity.IsRevoked = true;
-                await _db.SaveChangesAsync();
+                await _refreshTokenRepo.RevokeAsync(tokenEntity);
             }
 
             await _refreshTokenService.RevokeAsync(refreshToken);

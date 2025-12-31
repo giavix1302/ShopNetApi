@@ -14,21 +14,18 @@ namespace ShopNetApi.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IConfiguration _config;
         private readonly OtpService _otpService;
         private readonly EmailService _emailService;
         private readonly IAuthService _authService;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
-            IConfiguration config,
             OtpService otpService,
             EmailService emailService,
             IAuthService authService
             )
         {
             _userManager = userManager;
-            _config = config;
             _otpService = otpService;
             _emailService = emailService;
             _authService = authService;

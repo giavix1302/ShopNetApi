@@ -1,20 +1,19 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using ShopNetApi.Data;
 using ShopNetApi.DTOs.Category;
 using ShopNetApi.Models;
+using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services.Interfaces;
 
 namespace ShopNetApi.Services
 {
     public class CategoryService : ICategoryService
     {
-        private readonly ApplicationDbContext _db;
+        private readonly ICategoryRepository _categoryRepo;
 
-        public CategoryService(ApplicationDbContext db)
+        public CategoryService(ICategoryRepository categoryRepo)
         {
-            _db = db;
+            _categoryRepo = categoryRepo;
         }
-
 
         public async Task<CategoryResponseDto> CreateAsync(CreateCategoryDto dto)
         {

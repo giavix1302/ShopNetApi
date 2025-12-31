@@ -6,6 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using ShopNetApi.Data;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Models;
+using ShopNetApi.Repositories;
+using ShopNetApi.Repositories.Interfaces;
 using ShopNetApi.Services;
 using ShopNetApi.Services.Interfaces;
 using ShopNetApi.Settings;
@@ -73,7 +75,6 @@ builder.Services.Configure<IdentityOptions>(options =>
 
 // ===================== JWT =====================
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IAuthService, AuthService>();
 
 var jwtConfig = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtConfig["Key"]!);
@@ -114,16 +115,25 @@ builder.Services.Configure<SmtpSettings>(
     builder.Configuration.GetSection("Smtp")
 );
 
+// ===================== Services =====================
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<OtpService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddScoped<RefreshTokenService>();
-
-// ===================== Category =====================
-builder.Services.AddScoped<ICategoryService, CategoryService>();
-
 // ===================== Brand =====================
 builder.Services.AddScoped<IBrandService, BrandService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+
+
+// ===================== Repository =====================
+
+// Category
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+// RefreshToken
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+// Brand
+builder.Services.AddScoped<IBrandRepository, BrandRepository>();
 
 var app = builder.Build();
 
