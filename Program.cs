@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using ShopNetApi.Data;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Middlewares;
@@ -17,52 +18,25 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===================== Controllers =====================
-builder.Services.AddControllers();
+// ==========================================================
+// 1. LOGGING (SERILOG)
+// ==========================================================
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
-// ===================== Swagger =====================
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new()
-    {
-        Title = "ShopNetApi",
-        Version = "v1"
-    });
-});
+builder.Host.UseSerilog();
 
-// ===================== Config response =====================
-builder.Services.Configure<ApiBehaviorOptions>(options =>
-{
-    options.InvalidModelStateResponseFactory = context =>
-    {
-        var errors = context.ModelState
-            .Where(x => x.Value!.Errors.Count > 0)
-            .Select(x => new
-            {
-                field = x.Key,
-                message = x.Value!.Errors.First().ErrorMessage
-            });
-
-        return new BadRequestObjectResult(
-            ApiResponse<object>.Fail(
-                "Dữ liệu không hợp lệ",
-                errors
-            )
-        );
-    };
-});
-
-// ===================== EF Core =====================
-// (thêm khi làm migration)
+// ==========================================================
+// 2. DATABASE & IDENTITY (ENTITY FRAMEWORK)
+// ==========================================================
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
-);
-// ===================== Identity =====================
-builder.Services
-    .AddIdentity<ApplicationUser, IdentityRole<long>>()
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole<long>>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
@@ -74,9 +48,10 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.Password.RequireNonAlphanumeric = false;
 });
 
-// ===================== JWT =====================
+// ==========================================================
+// 3. AUTHENTICATION & AUTHORIZATION (JWT)
+// ==========================================================
 builder.Services.AddHttpContextAccessor();
-
 var jwtConfig = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtConfig["Key"]!);
 
@@ -87,13 +62,14 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    options.UseSecurityTokenValidators = true;
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-
         ValidIssuer = jwtConfig["Issuer"],
         ValidAudience = jwtConfig["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(key)
@@ -102,61 +78,70 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// ===================== AutoMapper =====================
+// ==========================================================
+// 4. INFRASTRUCTURE (REDIS, SMTP, AUTOMAPPER, SWAGGER)
+// ==========================================================
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c => c.SwaggerDoc("v1", new() { Title = "ShopNetApi", Version = "v1" }));
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
-// ===================== REDIS + SMTP =====================
 builder.Services.AddSingleton<IConnectionMultiplexer>(
-    ConnectionMultiplexer.Connect(
-        builder.Configuration["Redis:ConnectionString"]!
-    )
-);
+    ConnectionMultiplexer.Connect(builder.Configuration["Redis:ConnectionString"]!));
 
-builder.Services.Configure<SmtpSettings>(
-    builder.Configuration.GetSection("Smtp")
-);
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 
-// ===================== Services =====================
-builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<OtpService>();
+// Custom Validation Response
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(x => x.Value!.Errors.Count > 0)
+            .Select(x => new { field = x.Key, message = x.Value!.Errors.First().ErrorMessage });
+        return new BadRequestObjectResult(ApiResponse<object>.Fail("Dữ liệu không hợp lệ", errors));
+    };
+});
+
+// ==========================================================
+// 5. DEPENDENCY INJECTION (REPOSITORIES & SERVICES)
+// ==========================================================
+// Repositories
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IBrandRepository, BrandRepository>();
+
+// Services
+builder.Services.AddScoped<IEmailService, EmailService>(); // Khuyên dùng Interface
+builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-
-builder.Services.AddScoped<RefreshTokenService>();
-// ===================== Brand =====================
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
-
-// ===================== Repository =====================
-
-// Category
-builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
-// RefreshToken
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-// Brand
-builder.Services.AddScoped<IBrandRepository, BrandRepository>();
-
+// ==========================================================
+// 6. PIPELINE & MIDDLEWARES
+// ==========================================================
 var app = builder.Build();
 
+// Seed Data
 using (var scope = app.Services.CreateScope())
 {
     await DbSeeder.SeedRoles(scope.ServiceProvider);
 }
 
-// ===================== Middleware =====================
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ShopNetApi v1");
-    });
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "ShopNetApi v1"));
 }
 
 app.UseHttpsRedirection();
 app.UseMiddleware<ExceptionMiddleware>();
+app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
+
 app.Run();

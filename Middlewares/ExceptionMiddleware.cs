@@ -7,10 +7,12 @@ namespace ShopNetApi.Middlewares
     public class ExceptionMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly ILogger<ExceptionMiddleware> _logger;
 
-        public ExceptionMiddleware(RequestDelegate next)
+        public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
         {
             _next = next;
+            _logger = logger;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -21,10 +23,19 @@ namespace ShopNetApi.Middlewares
             }
             catch (AppException ex)
             {
+                _logger.LogWarning(ex,
+                    "Handled application exception. Path={Path}",
+                    context.Request.Path);
+
                 await HandleException(context, ex.StatusCode, ex.Message);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
+                _logger.LogError(ex,
+                    "Unhandled exception. Path={Path}",
+                    context.Request.Path);
+
                 await HandleException(
                     context,
                     (int)HttpStatusCode.InternalServerError,

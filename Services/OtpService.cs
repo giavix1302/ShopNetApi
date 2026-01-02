@@ -1,11 +1,12 @@
-﻿using StackExchange.Redis;
+﻿using ShopNetApi.Services.Interfaces;
+using StackExchange.Redis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
 namespace ShopNetApi.Services
 {
-    public class OtpService
+    public class OtpService : IOtpService
     {
         private readonly IDatabase _db;
 
@@ -90,10 +91,5 @@ namespace ShopNetApi.Services
             => $"otp:register:{email}";
     }
 
-    // ===================== RESULT SAU VERIFY =====================
-    public class OtpVerifyResult
-    {
-        public string Email { get; set; } = default!;
-        public string FullName { get; set; } = default!;
-    }
+
 }

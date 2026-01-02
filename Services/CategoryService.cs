@@ -10,10 +10,17 @@ namespace ShopNetApi.Services
     public class CategoryService : ICategoryService
     {
         private readonly ICategoryRepository _categoryRepo;
+        private readonly ILogger<CategoryService> _logger;
+        private readonly ICurrentUserService _currentUser;
 
-        public CategoryService(ICategoryRepository categoryRepo)
+        public CategoryService(
+            ICategoryRepository categoryRepo,
+            ILogger<CategoryService> logger,
+            ICurrentUserService currentUser)
         {
             _categoryRepo = categoryRepo;
+            _logger = logger;
+            _currentUser = currentUser;
         }
 
         // ================= CREATE =================
@@ -29,6 +36,13 @@ namespace ShopNetApi.Services
             };
 
             await _categoryRepo.AddAsync(category);
+
+            _logger.LogInformation(
+                "Category created. CategoryId={CategoryId}, Name={Name} | Email={Email}",
+                category.Id,
+                category.Name,
+                _currentUser.Email
+            );
 
             return MapToResponse(category);
         }
@@ -47,6 +61,13 @@ namespace ShopNetApi.Services
             category.Description = dto.Description;
 
             await _categoryRepo.UpdateAsync(category);
+
+            _logger.LogInformation(
+                "Category updated. CategoryId={CategoryId}, Name={Name} | Email={Email}",
+                category.Id,
+                category.Name,
+                _currentUser.Email
+            );
 
             return MapToResponse(category);
         }
@@ -84,6 +105,13 @@ namespace ShopNetApi.Services
                 );
 
             await _categoryRepo.DeleteAsync(category);
+
+            _logger.LogWarning(
+                "Category deleted. CategoryId={CategoryId}, Name={Name} | Email={Email}",
+                category.Id,
+                category.Name,
+                _currentUser.Email
+            );
         }
 
         // ================= MAPPER =================

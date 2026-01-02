@@ -17,19 +17,21 @@ namespace ShopNetApi.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
-        private readonly RefreshTokenService _refreshTokenService;
+        private readonly IRefreshTokenService _refreshTokenService;
         private readonly IRefreshTokenRepository _refreshTokenRepo;
-        private readonly OtpService _otpService;
-        private readonly EmailService _emailService;
+        private readonly IOtpService _otpService;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             IConfiguration config,
             IHttpContextAccessor http,
-            RefreshTokenService refreshTokenService,
+            IRefreshTokenService refreshTokenService,
             IRefreshTokenRepository refreshTokenRepo,
-            OtpService otpService,
-            EmailService emailService)
+            IOtpService otpService,
+            IEmailService emailService,
+            ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _config = config;
@@ -38,17 +40,37 @@ namespace ShopNetApi.Services
             _refreshTokenRepo = refreshTokenRepo;
             _otpService = otpService;
             _emailService = emailService;
+            _logger = logger;
         }
 
         public async Task<string> LoginAsync(LoginDto dto)
         {
+            _logger.LogInformation(
+                "Login attempt. Email={Email}", dto.Email);
+
             var user = await _userManager.FindByEmailAsync(dto.Email);
 
             if (user == null || !user.Enabled)
+            {
+                _logger.LogWarning(
+                    "Login failed. Email={Email}. Reason=User not found or disabled",
+                    dto.Email);
+
                 throw new UnauthorizedException("Invalid credentials");
+            }
+
 
             if (!await _userManager.CheckPasswordAsync(user, dto.Password))
+            {
+                _logger.LogWarning(
+                    "Login failed. Email={Email}. Reason=Invalid password",
+                    dto.Email);
+
                 throw new UnauthorizedException("Invalid credentials");
+            }
+
+            _logger.LogInformation(
+                "Login success. UserId={UserId}", user.Id);
 
             return await SignInAsync(user);
         }
@@ -58,9 +80,19 @@ namespace ShopNetApi.Services
         {
             var existing = await _userManager.FindByEmailAsync(dto.Email);
             if (existing != null)
+            {
+                _logger.LogWarning(
+                    "Register failed. Email={Email}. Reason=Email already exists",
+                    dto.Email);
+
                 throw new BadRequestException("Email đã tồn tại");
+            }
 
             var otp = await _otpService.GenerateAndStoreAsync(dto.Email, dto.FullName!);
+
+            _logger.LogInformation(
+                "Register OTP sent. Email={Email}", dto.Email);
+
             await _emailService.SendOtpAsync(dto.Email, otp);
         }
 
@@ -69,7 +101,12 @@ namespace ShopNetApi.Services
         {
             var otpResult = await _otpService.VerifyAsync(dto.Email, dto.Otp);
             if (otpResult == null)
+            {
+                _logger.LogWarning(
+                    "Verify OTP failed. Email={Email}", dto.Email);
+
                 throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
+            }
 
             var user = new ApplicationUser
             {
@@ -81,10 +118,20 @@ namespace ShopNetApi.Services
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);
+
             if (!result.Succeeded)
+            {
+                _logger.LogError(
+                    "User creation failed after OTP verification. Email={Email}",
+                    dto.Email);
+
                 throw new BadRequestException("Đăng ký thất bại");
+            }
 
             await _userManager.AddToRoleAsync(user, "User");
+
+            _logger.LogInformation(
+                "User registered successfully. UserId={UserId}", user.Id);
 
             return await SignInAsync(user);
         }
@@ -97,7 +144,8 @@ namespace ShopNetApi.Services
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.FullName ?? user.UserName!)
+                new Claim(ClaimTypes.Name, user.FullName ?? user.UserName!),
+                new Claim(ClaimTypes.Email, user.Email!)
             };
 
             foreach (var r in roles)
@@ -108,6 +156,8 @@ namespace ShopNetApi.Services
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_config["Jwt:Key"]!)
             );
+
+            _logger.LogInformation("Generating JWT token. UserId={UserId}", user.Id);
 
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
@@ -133,7 +183,10 @@ namespace ShopNetApi.Services
             });
 
             await _refreshTokenService.SaveAsync(refreshToken, user.Id, TimeSpan.FromDays(7));
+
             SetCookie(refreshToken);
+
+            _logger.LogInformation("Refresh token generated and stored. UserId={UserId}", user.Id);
 
             return accessToken;
         }
@@ -151,19 +204,29 @@ namespace ShopNetApi.Services
 
         public async Task<string?> RefreshAsync(string refreshToken)
         {
-            var hash = _refreshTokenService.HashToken(refreshToken);
-
-            var userId = await _refreshTokenService.ValidateAsync(hash);
+            var userId = await _refreshTokenService.ValidateAsync(refreshToken);
             if (userId == null)
+            {
+                _logger.LogWarning("Refresh token validation failed");
                 return null;
+            }
 
             var tokenEntity = await _refreshTokenRepo.GetLatestValidAsync(userId.Value);
 
             if (tokenEntity == null)
+            {
+                _logger.LogWarning("Refresh token not found or revoked. UserId={UserId}", userId.Value);
                 return null;
+            }
 
             if (!BCrypt.Net.BCrypt.Verify(refreshToken, tokenEntity.TokenHash))
+            {
+                _logger.LogWarning(
+                    "Refresh token hash mismatch. UserId={UserId}",
+                    userId.Value);
+
                 return null;
+            }
 
             await _refreshTokenRepo.RevokeAsync(tokenEntity);
 
@@ -173,6 +236,9 @@ namespace ShopNetApi.Services
 
             if (user == null) return null;
 
+            _logger.LogInformation(
+                "Refresh token success. UserId={UserId}", user.Id);
+
             return await SignInAsync(user); // trả accessToken mới
         }
 
@@ -180,7 +246,10 @@ namespace ShopNetApi.Services
         {
             var userId = await _refreshTokenService.ValidateAsync(refreshToken);
             if (userId == null)
+            {
+                _logger.LogWarning("Logout failed. Invalid refresh token");
                 return;
+            }
 
             var tokenEntity = await _refreshTokenRepo.GetLatestValidAsync(userId.Value);
 
@@ -188,6 +257,8 @@ namespace ShopNetApi.Services
             {
                 await _refreshTokenRepo.RevokeAsync(tokenEntity);
             }
+
+            _logger.LogInformation("User logout. UserId={UserId}", userId.Value);
 
             await _refreshTokenService.RevokeAsync(refreshToken);
         }

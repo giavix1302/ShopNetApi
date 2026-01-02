@@ -1,10 +1,11 @@
-﻿using StackExchange.Redis;
+﻿using ShopNetApi.Services.Interfaces;
+using StackExchange.Redis;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace ShopNetApi.Services
 {
-    public class RefreshTokenService
+    public class RefreshTokenService : IRefreshTokenService
     {
         private readonly IDatabase _redis;
 

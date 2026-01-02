@@ -9,10 +9,17 @@ namespace ShopNetApi.Services
     public class BrandService : IBrandService
     {
         private readonly IBrandRepository _brandRepo;
+        private readonly ILogger<BrandService> _logger;
+        private readonly ICurrentUserService _currentUser;
 
-        public BrandService(IBrandRepository brandRepo)
+        public BrandService(
+            IBrandRepository brandRepo,
+            ILogger<BrandService> logger,
+            ICurrentUserService currentUser)
         {
             _brandRepo = brandRepo;
+            _logger = logger;
+            _currentUser = currentUser;
         }
 
         // ================= CREATE =================
@@ -28,6 +35,10 @@ namespace ShopNetApi.Services
             };
 
             await _brandRepo.AddAsync(brand);
+
+            _logger.LogInformation(
+                "Brand created. BrandId={BrandId}, Name={Name} | Email={Email}",
+                brand.Id, brand.Name, _currentUser.Email);
 
             return MapToResponse(brand);
         }
@@ -47,6 +58,11 @@ namespace ShopNetApi.Services
 
             await _brandRepo.UpdateAsync(brand);
 
+
+            _logger.LogInformation(
+                "Brand updated. BrandId={BrandId}, Name={Name} | Email={Email}",
+                brand.Id, brand.Name, _currentUser.Email);
+
             return MapToResponse(brand);
         }
 
@@ -63,6 +79,10 @@ namespace ShopNetApi.Services
                 );
 
             await _brandRepo.DeleteAsync(brand);
+
+            _logger.LogWarning(
+                "Brand deleted. BrandId={BrandId}, Name={Name} | Email={Email}",
+                brand.Id, brand.Name, _currentUser.Email);
         }
 
         // ================= GET ALL =================

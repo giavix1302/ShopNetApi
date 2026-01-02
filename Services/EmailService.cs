@@ -1,11 +1,12 @@
 ﻿using Microsoft.Extensions.Options;
+using ShopNetApi.Services.Interfaces;
 using ShopNetApi.Settings;
 using System.Net;
 using System.Net.Mail;
 
 namespace ShopNetApi.Services
 {
-    public class EmailService
+    public class EmailService : IEmailService
     {
         private readonly SmtpSettings _smtp;
 
