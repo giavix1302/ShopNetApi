@@ -1,12 +1,9 @@
-﻿namespace ShopNetApi.Models
+﻿namespace ShopNetApi.DTOs.Product
 {
-    public class Color
+    public class ProductColorResponseDto
     {
         public long Id { get; set; }
-
         public string ColorName { get; set; } = null!;
         public string? HexCode { get; set; }
-
-        public ICollection<ProductColor> ProductColors { get; set; } = new List<ProductColor>();
     }
 }

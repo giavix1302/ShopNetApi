@@ -20,13 +20,11 @@
         public long? BrandId { get; set; }
         public Brand? Brand { get; set; }
 
-        public long? ColorId { get; set; }
-        public Color? Color { get; set; }
-
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
         public ICollection<ProductSpecification> Specifications { get; set; } = new List<ProductSpecification>();
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
+        public ICollection<ProductColor> ProductColors { get; set; } = new List<ProductColor>();
     }
 }

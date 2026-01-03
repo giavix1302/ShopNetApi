@@ -11,6 +11,7 @@ namespace ShopNetApi.Data
             : base(options)
         {
         }
+        public DbSet<ProductColor> ProductColors => Set<ProductColor>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<Product> Products => Set<Product>();
         public DbSet<Category> Categories => Set<Category>();
@@ -29,6 +30,11 @@ namespace ShopNetApi.Data
         {
             modelBuilder.HasPostgresEnum<UserRole>();
             modelBuilder.HasPostgresEnum<OrderStatus>();
+
+            modelBuilder.Entity<ProductImage>()
+                .HasIndex(x => new { x.ProductId, x.IsPrimary })
+                .IsUnique()
+                .HasFilter("\"IsPrimary\" = true");
 
             base.OnModelCreating(modelBuilder);
         }

@@ -1,9 +1,11 @@
 ﻿using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using ShopNetApi.Exceptions;
+using ShopNetApi.Services.Interfaces;
 
 namespace ShopNetApi.Services
 {
-    public class CloudinaryService
+    public class CloudinaryService : ICloudinaryService
     {
         private readonly Cloudinary _cloudinary;
 
@@ -18,17 +20,24 @@ namespace ShopNetApi.Services
             _cloudinary = new Cloudinary(acc);
         }
 
-        public async Task<string> UploadImageAsync(IFormFile file)
+        public async Task<(string Url, string PublicId)> UploadImageAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
-                throw new Exception("File không hợp lệ");
+                throw new BadRequestException("File không hợp lệ");
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType))
+                throw new BadRequestException("Định dạng ảnh không hợp lệ");
 
             await using var stream = file.OpenReadStream();
 
             var uploadParams = new ImageUploadParams
             {
                 File = new FileDescription(file.FileName, stream),
-                Folder = "products", // thư mục trên Cloudinary
+                Folder = "products",
+                UseFilename = true,
+                UniqueFilename = true,
+                Overwrite = false,
                 Transformation = new Transformation()
                     .Width(500)
                     .Height(500)
@@ -38,9 +47,21 @@ namespace ShopNetApi.Services
             var result = await _cloudinary.UploadAsync(uploadParams);
 
             if (result.StatusCode != System.Net.HttpStatusCode.OK)
-                throw new Exception("Upload ảnh thất bại");
+                throw new InternalServerException("Upload ảnh thất bại");
 
-            return result.SecureUrl.ToString(); // URL để lưu DB
+            return (result.SecureUrl.ToString(), result.PublicId);
+        }
+
+        public async Task DeleteImageAsync(string publicId)
+        {
+            if (string.IsNullOrWhiteSpace(publicId))
+                throw new BadRequestException("PublicId không hợp lệ");
+
+            var deleteParams = new DeletionParams(publicId);
+            var result = await _cloudinary.DestroyAsync(deleteParams);
+
+            if (result.Result != "ok" && result.Result != "not found")
+                throw new InternalServerException("Xóa ảnh Cloudinary thất bại");
         }
     }
 }
