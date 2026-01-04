@@ -67,5 +67,33 @@ namespace ShopNetApi.Repositories
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
+
+        public async Task<bool> HasSpecificationsAsync(long productId)
+        {
+            return await _db.ProductSpecifications
+                .AnyAsync(x => x.ProductId == productId);
+        }
+
+        public async Task ReplaceSpecificationsAsync(
+            Product product,
+            List<ProductSpecification> specs
+        )
+        {
+            // Load existing specs (nếu chưa load)
+            await _db.Entry(product)
+                .Collection(p => p.Specifications)
+                .LoadAsync();
+
+            // Xóa cũ
+            _db.ProductSpecifications.RemoveRange(product.Specifications);
+
+            // Gán mới
+            foreach (var spec in specs)
+            {
+                spec.ProductId = product.Id;
+            }
+
+            await _db.ProductSpecifications.AddRangeAsync(specs);
+        }
     }
 }

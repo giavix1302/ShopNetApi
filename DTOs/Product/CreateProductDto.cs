@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using ShopNetApi.DTOs.ProductSpecification;
+using System.ComponentModel.DataAnnotations;
 
 namespace ShopNetApi.DTOs.Product
 {
@@ -19,7 +20,7 @@ namespace ShopNetApi.DTOs.Product
         public long? CategoryId { get; set; }
         [Required]
         public long? BrandId { get; set; }
-        [Required]
-        public long? ColorId { get; set; }
+
+        public List<ProductSpecRequestDto>? Specifications { get; set; }
     }
 }

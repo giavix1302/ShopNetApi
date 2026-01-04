@@ -13,5 +13,11 @@ namespace ShopNetApi.Repositories.Interfaces
         Task<Product?> GetByIdAsync(long id);
         Task<Product?> GetByIdWithRelationsAsync(long id);
         Task<List<Product>> GetAllAsync();
+
+        Task<bool> HasSpecificationsAsync(long productId);
+        Task ReplaceSpecificationsAsync(
+            Product product,
+            List<ProductSpecification> specs
+        );
     }
 }

@@ -36,6 +36,27 @@ namespace ShopNetApi.Data
                 .IsUnique()
                 .HasFilter("\"IsPrimary\" = true");
 
+            modelBuilder.Entity<ProductSpecification>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.SpecName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.SpecValue)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.HasIndex(x => new { x.ProductId, x.SpecName })
+                    .IsUnique(); // ❌ cấm trùng SpecName trong 1 Product
+
+                entity.HasOne(x => x.Product)
+                    .WithMany(p => p.Specifications)
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             base.OnModelCreating(modelBuilder);
         }
     }

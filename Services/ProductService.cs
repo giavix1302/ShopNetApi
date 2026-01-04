@@ -47,6 +47,15 @@ namespace ShopNetApi.Services
                 BrandId = dto.BrandId
             };
 
+            if (dto.Specifications != null && dto.Specifications.Any())
+            {
+                product.Specifications = dto.Specifications.Select(s => new ProductSpecification
+                {
+                    SpecName = s.Key,
+                    SpecValue = s.Value
+                }).ToList();
+            }
+
             await _productRepo.AddAsync(product);
 
             _logger.LogInformation(
@@ -63,6 +72,36 @@ namespace ShopNetApi.Services
             var product = await _productRepo.GetByIdAsync(id);
             if (product == null)
                 throw new NotFoundException("Product not found");
+
+            var hasSpecsInDb = await _productRepo.HasSpecificationsAsync(product.Id);
+
+            if (hasSpecsInDb)
+            {
+                if (dto.Specifications == null)
+                    throw new BadRequestException(
+                        "Specifications must be provided when product already has specifications"
+                    );
+
+                var newSpecs = dto.Specifications.Select(s => new ProductSpecification
+                {
+                    ProductId = product.Id,
+                    SpecName = s.Key,
+                    SpecValue = s.Value
+                }).ToList();
+
+                await _productRepo.ReplaceSpecificationsAsync(product, newSpecs);
+            }
+            else
+            {
+                if (dto.Specifications != null && dto.Specifications.Any())
+                {
+                    product.Specifications = dto.Specifications.Select(s => new ProductSpecification
+                    {
+                        SpecName = s.Key,
+                        SpecValue = s.Value
+                    }).ToList();
+                }
+            }
 
             if (product.Name != dto.Name)
             {
@@ -88,6 +127,12 @@ namespace ShopNetApi.Services
             product.BrandId = dto.BrandId;
 
             await _productRepo.UpdateAsync(product);
+
+            _logger.LogInformation(
+                "Product updated. ProductId={ProductId} | Email={Email}",
+                product.Id,
+                _currentUser.Email
+            );
 
             return MapToResponse(product);
         }

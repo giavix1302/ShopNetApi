@@ -1,4 +1,6 @@
-﻿namespace ShopNetApi.DTOs.Product
+﻿using ShopNetApi.DTOs.ProductSpecification;
+
+namespace ShopNetApi.DTOs.Product
 {
     public class UpdateProductDto
     {
@@ -13,6 +15,7 @@
 
         public long? CategoryId { get; set; }
         public long? BrandId { get; set; }
-        public long? ColorId { get; set; }
+
+        public List<ProductSpecRequestDto>? Specifications { get; set; }
     }
 }
