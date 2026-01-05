@@ -11,14 +11,14 @@ namespace ShopNetApi.Services
     public class ProductImageService : IProductImageService
     {
         private readonly IProductImageRepository _repo;
-        private readonly CloudinaryService _cloudinary;
+        private readonly ICloudinaryService _cloudinary;
         private readonly ApplicationDbContext _db;
         private readonly ILogger<ProductImageService> _logger;
         private readonly ICurrentUserService _currentUser;
 
         public ProductImageService(
             IProductImageRepository repo,
-            CloudinaryService cloudinary,
+            ICloudinaryService cloudinary,
             ApplicationDbContext db,
             ILogger<ProductImageService> logger,
             ICurrentUserService currentUser)

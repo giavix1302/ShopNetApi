@@ -113,6 +113,7 @@ builder.Services.AddScoped<IBrandRepository, BrandRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IProductSpecificationRepository, ProductSpecificationRepository>();
 builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
+builder.Services.AddScoped<IColorRepository, ColorRepository>();
 
 // Services
 builder.Services.AddScoped<IEmailService, EmailService>(); // Khuyên dùng Interface
@@ -126,6 +127,7 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IProductSpecificationService, ProductSpecificationService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
+builder.Services.AddScoped<IColorService, ColorService>();
 
 
 // ==========================================================

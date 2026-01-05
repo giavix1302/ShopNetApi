@@ -31,6 +31,22 @@ namespace ShopNetApi.Data
             modelBuilder.HasPostgresEnum<UserRole>();
             modelBuilder.HasPostgresEnum<OrderStatus>();
 
+            // ========= COLOR CONSTRAINT =========
+            modelBuilder.Entity<Color>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.ColorName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.HexCode)
+                    .HasMaxLength(7);
+
+                entity.HasIndex(x => x.ColorName)
+                    .IsUnique(); // ❌ cấm trùng tên màu
+            });
+
             modelBuilder.Entity<ProductImage>()
                 .HasIndex(x => new { x.ProductId, x.IsPrimary })
                 .IsUnique()
