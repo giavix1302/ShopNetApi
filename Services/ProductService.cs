@@ -12,15 +12,24 @@ namespace ShopNetApi.Services
         private readonly IProductRepository _productRepo;
         private readonly ILogger<ProductService> _logger;
         private readonly ICurrentUserService _currentUser;
+        private readonly IBrandRepository _brandRepo;
+        private readonly ICategoryRepository _categoryRepo;
+        private readonly IColorRepository _colorRepo;
 
         public ProductService(
             IProductRepository productRepo,
             ILogger<ProductService> logger,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            IBrandRepository brandRepo,
+            ICategoryRepository categoryRepo,
+            IColorRepository colorRepo)
         {
             _productRepo = productRepo;
             _logger = logger;
             _currentUser = currentUser;
+            _brandRepo = brandRepo;
+            _categoryRepo = categoryRepo;
+            _colorRepo = colorRepo;
         }
 
         // ================= CREATE =================
@@ -34,6 +43,19 @@ namespace ShopNetApi.Services
             {
                 slug = $"{baseSlug}-{count++}";
             }
+
+            if (!await _brandRepo.ExistsAsync(dto.BrandId))
+                throw new BadRequestException("Brand không tồn tại");
+
+            if (!await _categoryRepo.ExistsAsync(dto.CategoryId))
+                throw new BadRequestException("Category không tồn tại");
+
+            if (dto.ColorIds == null || !dto.ColorIds.Any())
+                throw new BadRequestException("Phải chọn ít nhất 1 màu");
+
+            var colorsExist = await _colorRepo.AllExistAsync(dto.ColorIds);
+            if (!colorsExist)
+                throw new BadRequestException("Một hoặc nhiều màu không tồn tại");
 
             var product = new Product
             {
@@ -56,11 +78,24 @@ namespace ShopNetApi.Services
                 }).ToList();
             }
 
+            if (dto.ColorIds != null && dto.ColorIds.Any())
+            {
+                product.ProductColors = dto.ColorIds.Select(colorId =>
+                    new ProductColor
+                    {
+                        ColorId = colorId
+                    }).ToList();
+            }
+
+
             await _productRepo.AddAsync(product);
 
             _logger.LogInformation(
                 "Product created. ProductId={ProductId}, Slug={Slug} | Email={Email}",
                 product.Id, product.Slug, _currentUser.Email);
+
+            var createdProduct = await _productRepo.GetByIdWithIncludesAsync(product.Id)
+                ?? throw new NotFoundException("Product vừa tạo không tồn tại");
 
             return MapToResponse(product);
         }
@@ -101,6 +136,11 @@ namespace ShopNetApi.Services
                         SpecValue = s.Value
                     }).ToList();
                 }
+            }
+
+            if (dto.ColorIds != null)
+            {
+                await _productRepo.ReplaceColorsAsync(product, dto.ColorIds);
             }
 
             if (product.Name != dto.Name)

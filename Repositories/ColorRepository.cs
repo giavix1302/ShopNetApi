@@ -63,5 +63,11 @@ namespace ShopNetApi.Repositories
             _db.Colors.Remove(color);
             await _db.SaveChangesAsync();
         }
+
+        public async Task<bool> AllExistAsync(List<long> colorIds)
+        {
+            return await _db.Colors
+                .CountAsync(c => colorIds.Contains(c.Id)) == colorIds.Count;
+        }
     }
 }

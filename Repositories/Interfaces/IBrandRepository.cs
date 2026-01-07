@@ -11,5 +11,6 @@ namespace ShopNetApi.Repositories.Interfaces
         Task<List<Brand>> GetAllAsync();
         Task UpdateAsync(Brand brand);
         Task DeleteAsync(Brand brand);
+        Task<bool> ExistsAsync(long brandId);
     }
 }

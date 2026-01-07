@@ -1,4 +1,5 @@
 ﻿using ShopNetApi.DTOs.ProductSpecification;
+using System.ComponentModel.DataAnnotations;
 
 namespace ShopNetApi.DTOs.Product
 {
@@ -13,9 +14,13 @@ namespace ShopNetApi.DTOs.Product
         public int StockQuantity { get; set; }
         public bool IsActive { get; set; }
 
+        [Required]
         public long? CategoryId { get; set; }
+        [Required]
         public long? BrandId { get; set; }
 
         public List<ProductSpecRequestDto>? Specifications { get; set; }
+
+        public List<long>? ColorIds { get; set; }
     }
 }

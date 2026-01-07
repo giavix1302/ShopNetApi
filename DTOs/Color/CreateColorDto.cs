@@ -1,8 +1,12 @@
-﻿namespace ShopNetApi.DTOs.Color
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ShopNetApi.DTOs.Color
 {
     public class CreateColorDto
     {
+        [Required]
         public string ColorName { get; set; } = null!;
-        public string? HexCode { get; set; }
+        [Required]
+        public string HexCode { get; set; }
     }
 }

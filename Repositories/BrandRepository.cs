@@ -62,5 +62,10 @@ namespace ShopNetApi.Repositories
             _db.Brands.Remove(brand);
             await _db.SaveChangesAsync();
         }
+
+        public async Task<bool> ExistsAsync(long brandId)
+        {
+            return await _db.Brands.AnyAsync(b => b.Id == brandId);
+        }
     }
 }

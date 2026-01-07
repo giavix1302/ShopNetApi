@@ -95,5 +95,36 @@ namespace ShopNetApi.Repositories
 
             await _db.ProductSpecifications.AddRangeAsync(specs);
         }
+
+        public async Task<bool> HasColorsAsync(long productId)
+        {
+            return await _db.ProductColors
+                .AnyAsync(pc => pc.ProductId == productId);
+        }
+
+        public async Task ReplaceColorsAsync(Product product, List<long> colorIds)
+        {
+            _db.ProductColors.RemoveRange(product.ProductColors);
+
+            var newColors = colorIds.Select(colorId => new ProductColor
+            {
+                ProductId = product.Id,
+                ColorId = colorId
+            });
+
+            await _db.ProductColors.AddRangeAsync(newColors);
+        }
+
+        public async Task<Product?> GetByIdWithIncludesAsync(long id)
+        {
+            return await _db.Products
+                .Include(p => p.Brand)
+                .Include(p => p.Category)
+                .Include(p => p.ProductColors)
+                    .ThenInclude(pc => pc.Color)
+                .Include(p => p.Specifications)
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
     }
 }

@@ -19,5 +19,13 @@ namespace ShopNetApi.Repositories.Interfaces
             Product product,
             List<ProductSpecification> specs
         );
+
+        Task<bool> HasColorsAsync(long productId);
+        Task ReplaceColorsAsync(
+            Product product,
+            List<long> colorIds
+        );
+
+        Task<Product?> GetByIdWithIncludesAsync(long id);
     }
 }

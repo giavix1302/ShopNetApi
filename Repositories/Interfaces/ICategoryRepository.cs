@@ -4,6 +4,7 @@ namespace ShopNetApi.Repositories.Interfaces
 {
     public interface ICategoryRepository
     {
+        Task<bool> ExistsAsync(long categoryId);
         Task<bool> ExistsByNameAsync(string name, long? excludeId = null);
         Task<Category?> GetByIdAsync(long id);
         Task<List<Category>> GetAllAsync();

@@ -17,10 +17,12 @@ namespace ShopNetApi.DTOs.Product
         public int StockQuantity { get; set; }
 
         [Required]
-        public long? CategoryId { get; set; }
+        public long CategoryId { get; set; }
         [Required]
-        public long? BrandId { get; set; }
+        public long BrandId { get; set; }
 
         public List<ProductSpecRequestDto>? Specifications { get; set; }
+
+        public List<long> ColorIds { get; set; }
     }
 }

@@ -47,6 +47,24 @@ namespace ShopNetApi.Data
                     .IsUnique(); // ❌ cấm trùng tên màu
             });
 
+            modelBuilder.Entity<ProductColor>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.HasIndex(x => new { x.ProductId, x.ColorId })
+                    .IsUnique(); // ❌ cấm trùng Color trong 1 Product
+
+                entity.HasOne(x => x.Product)
+                    .WithMany(p => p.ProductColors)
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Color)
+                    .WithMany(c => c.ProductColors)
+                    .HasForeignKey(x => x.ColorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<ProductImage>()
                 .HasIndex(x => new { x.ProductId, x.IsPrimary })
                 .IsUnique()

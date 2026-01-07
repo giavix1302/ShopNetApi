@@ -63,5 +63,10 @@ namespace ShopNetApi.Repositories
             _db.Categories.Remove(category);
             await _db.SaveChangesAsync();
         }
+
+        public async Task<bool> ExistsAsync(long categoryId)
+        {
+            return await _db.Categories.AnyAsync(x => x.Id == categoryId);
+        }
     }
 }
