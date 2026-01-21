@@ -1,4 +1,5 @@
 ﻿using ShopNetApi.DTOs.Product;
+using ShopNetApi.DTOs.ProductSpecification;
 using ShopNetApi.Exceptions;
 using ShopNetApi.Models;
 using ShopNetApi.Repositories.Interfaces;
@@ -66,15 +67,16 @@ namespace ShopNetApi.Services
                 DiscountPrice = dto.DiscountPrice,
                 StockQuantity = dto.StockQuantity,
                 CategoryId = dto.CategoryId,
-                BrandId = dto.BrandId
+                BrandId = dto.BrandId,
+                IsActive = true
             };
 
             if (dto.Specifications != null && dto.Specifications.Any())
             {
                 product.Specifications = dto.Specifications.Select(s => new ProductSpecification
                 {
-                    SpecName = s.Key,
-                    SpecValue = s.Value
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue
                 }).ToList();
             }
 
@@ -97,49 +99,47 @@ namespace ShopNetApi.Services
             var createdProduct = await _productRepo.GetByIdWithIncludesAsync(product.Id)
                 ?? throw new NotFoundException("Product vừa tạo không tồn tại");
 
-            return MapToResponse(product);
+            return MapToResponse(createdProduct);
         }
 
 
         // ================= UPDATE =================
         public async Task<ProductResponseDto> UpdateAsync(long id, UpdateProductDto dto)
         {
-            var product = await _productRepo.GetByIdAsync(id);
+            var product = await _productRepo.GetByIdWithSpecificationsAsync(id);
             if (product == null)
                 throw new NotFoundException("Product not found");
 
-            var hasSpecsInDb = await _productRepo.HasSpecificationsAsync(product.Id);
-
-            if (hasSpecsInDb)
+            // Xử lý Specifications:
+            // - Nếu không truyền field (null) => không làm gì cả
+            // - Nếu truyền mảng rỗng => xóa tất cả Specifications trong DB
+            // - Nếu truyền khác => xóa trong DB và thêm cái mới truyền vào
+            if (dto.Specifications != null)
             {
-                if (dto.Specifications == null)
-                    throw new BadRequestException(
-                        "Specifications must be provided when product already has specifications"
-                    );
-
-                var newSpecs = dto.Specifications.Select(s => new ProductSpecification
+                if (dto.Specifications.Count == 0)
                 {
-                    ProductId = product.Id,
-                    SpecName = s.Key,
-                    SpecValue = s.Value
-                }).ToList();
-
-                await _productRepo.ReplaceSpecificationsAsync(product, newSpecs);
-            }
-            else
-            {
-                if (dto.Specifications != null && dto.Specifications.Any())
+                    // Xóa tất cả Specifications
+                    await _productRepo.ReplaceSpecificationsAsync(product, new List<ProductSpecification>());
+                }
+                else
                 {
-                    product.Specifications = dto.Specifications.Select(s => new ProductSpecification
+                    // Thay thế bằng Specifications mới
+                    var newSpecs = dto.Specifications.Select(s => new ProductSpecification
                     {
-                        SpecName = s.Key,
-                        SpecValue = s.Value
+                        ProductId = product.Id,
+                        SpecName = s.SpecName,
+                        SpecValue = s.SpecValue
                     }).ToList();
+
+                    await _productRepo.ReplaceSpecificationsAsync(product, newSpecs);
                 }
             }
 
             if (dto.ColorIds != null)
             {
+                var colorsExist = await _colorRepo.AllExistAsync(dto.ColorIds);
+                if (!colorsExist)
+                    throw new BadRequestException("Một hoặc nhiều màu không tồn tại");
                 await _productRepo.ReplaceColorsAsync(product, dto.ColorIds);
             }
 
@@ -162,7 +162,10 @@ namespace ShopNetApi.Services
             product.Price = dto.Price;
             product.DiscountPrice = dto.DiscountPrice;
             product.StockQuantity = dto.StockQuantity;
-            product.IsActive = dto.IsActive;
+            if (dto.IsActive.HasValue)
+            {
+                product.IsActive = dto.IsActive.Value;
+            }
             product.CategoryId = dto.CategoryId;
             product.BrandId = dto.BrandId;
 
@@ -173,8 +176,8 @@ namespace ShopNetApi.Services
                 product.Id,
                 _currentUser.Email
             );
-
-            return MapToResponse(product);
+            var productDataUpdate = await _productRepo.GetByIdWithRelationsAsync(product.Id);
+            return MapToResponse(productDataUpdate);
         }
 
 
@@ -232,7 +235,14 @@ namespace ShopNetApi.Services
                     Id = pc.Color.Id,
                     ColorName = pc.Color.ColorName,
                     HexCode = pc.Color.HexCode
-                }).ToList()
+                }).ToList(),
+
+                Specifications = product.Specifications?.Select(s => new ProductSpecificationResponseDto
+                {
+                    Id = s.Id,
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue
+                }).ToList() ?? new List<ProductSpecificationResponseDto>()
             };
         }
 

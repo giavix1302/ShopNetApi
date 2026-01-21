@@ -4,6 +4,6 @@
     {
         public IFormFile? Image { get; set; }
         public string? AltText { get; set; }
-        public bool IsPrimary { get; set; }
+        public bool? IsPrimary { get; set; }
     }
 }

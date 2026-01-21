@@ -5,9 +5,9 @@ namespace ShopNetApi.DTOs.ProductSpecification
     public class ProductSpecRequestDto
     {
         [Required]
-        public string Key { get; set; } = null!;
+        public string SpecName { get; set; } = null!;
 
         [Required]
-        public string Value { get; set; } = null!;
+        public string SpecValue { get; set; } = null!;
     }
 }

@@ -54,6 +54,14 @@ namespace ShopNetApi.Repositories
                 .Include(x => x.Brand)
                 .Include(x => x.ProductColors)
                 .ThenInclude(pc => pc.Color)
+                .Include(x => x.Specifications)
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public async Task<Product?> GetByIdWithSpecificationsAsync(long id)
+        {
+            return await _db.Products
+                .Include(x => x.Specifications)
                 .FirstOrDefaultAsync(x => x.Id == id);
         }
 
@@ -64,14 +72,9 @@ namespace ShopNetApi.Repositories
                 .Include(x => x.Brand)
                 .Include(x => x.ProductColors)
                 .ThenInclude(pc => pc.Color)
+                .Include(x => x.Specifications)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
-        }
-
-        public async Task<bool> HasSpecificationsAsync(long productId)
-        {
-            return await _db.ProductSpecifications
-                .AnyAsync(x => x.ProductId == productId);
         }
 
         public async Task ReplaceSpecificationsAsync(
@@ -104,13 +107,23 @@ namespace ShopNetApi.Repositories
 
         public async Task ReplaceColorsAsync(Product product, List<long> colorIds)
         {
+            // 1️⃣ Load colors hiện tại nếu chưa load
+            await _db.Entry(product)
+                .Collection(p => p.ProductColors)
+                .LoadAsync();
+
+            // 2️⃣ Xóa toàn bộ mapping cũ
             _db.ProductColors.RemoveRange(product.ProductColors);
 
-            var newColors = colorIds.Select(colorId => new ProductColor
-            {
-                ProductId = product.Id,
-                ColorId = colorId
-            });
+            // 3️⃣ Thêm mapping mới (distinct để tránh trùng)
+            var newColors = colorIds
+                .Distinct()
+                .Select(colorId => new ProductColor
+                {
+                    ProductId = product.Id,
+                    ColorId = colorId
+                })
+                .ToList();
 
             await _db.ProductColors.AddRangeAsync(newColors);
         }

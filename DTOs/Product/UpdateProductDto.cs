@@ -12,7 +12,7 @@ namespace ShopNetApi.DTOs.Product
         public decimal? DiscountPrice { get; set; }
 
         public int StockQuantity { get; set; }
-        public bool IsActive { get; set; }
+        public bool? IsActive { get; set; }
 
         [Required]
         public long? CategoryId { get; set; }

@@ -36,20 +36,34 @@ namespace ShopNetApi.Services
             if (!await _db.Products.AnyAsync(x => x.Id == dto.ProductId))
                 throw new NotFoundException("Product not found");
 
+            // Check có ảnh nào và có primary không TRƯỚC khi upload (tránh race condition)
+            var hasAnyImage = await _repo.AnyByProductAsync(dto.ProductId);
+            var existingPrimary = await _repo.GetPrimaryAsync(dto.ProductId);
+
+            // Upload ảnh lên Cloudinary
             var upload = await _cloudinary.UploadImageAsync(dto.Image);
 
-            var hasAnyImage = await _repo.AnyByProductAsync(dto.ProductId);
-
-            bool isPrimary = dto.IsPrimary;
+            bool isPrimary;
 
             // 🔥 Rule: ảnh đầu tiên luôn là primary
             if (!hasAnyImage)
             {
                 isPrimary = true;
             }
+            // Nếu không có primary (edge case: primary bị xóa nhưng còn ảnh khác)
+            else if (existingPrimary == null)
+            {
+                isPrimary = true;
+            }
+            // Nếu có primary và muốn set primary mới
             else if (dto.IsPrimary)
             {
                 await _repo.UnsetPrimaryAsync(dto.ProductId);
+                isPrimary = true;
+            }
+            else
+            {
+                isPrimary = false;
             }
 
             var image = new ProductImage
@@ -64,39 +78,56 @@ namespace ShopNetApi.Services
             await _repo.AddAsync(image);
 
             _logger.LogInformation(
-                "Product image created. ProductId={ProductId}, ImageId={ImageId} | Email={Email}",
-                image.ProductId, image.Id, _currentUser.Email);
+                "Product image created. ProductId={ProductId}, ImageId={ImageId}, IsPrimary={IsPrimary} | Email={Email}",
+                image.ProductId, image.Id, image.IsPrimary, _currentUser.Email);
 
             return Map(image);
         }
 
 
         // ================= UPDATE =================
-        public async Task<ProductImageResponseDto> UpdateAsync(long id, UpdateProductImageDto dto)
+        public async Task<ProductImageResponseDto> UpdateAsync(long productId, long imageId, UpdateProductImageDto dto)
         {
-            var image = await _repo.GetByIdAsync(id);
+            var image = await _repo.GetByIdAsync(imageId);
             if (image == null)
                 throw new NotFoundException("Product image not found");
 
-            // ❌ Không cho unset primary
-            if (image.IsPrimary && dto.IsPrimary == false)
-                throw new ConflictException("Cannot unset primary image");
+            // Validate image thuộc về product đúng
+            if (image.ProductId != productId)
+                throw new NotFoundException("Product image not found for this product");
 
-            if (dto.IsPrimary == true && !image.IsPrimary)
+            // Xử lý IsPrimary: chỉ xử lý nếu có truyền vào (nullable)
+            if (dto.IsPrimary.HasValue)
             {
-                await _repo.UnsetPrimaryAsync(image.ProductId);
-                image.IsPrimary = true;
+                // ❌ Không cho unset primary
+                if (image.IsPrimary && dto.IsPrimary.Value == false)
+                    throw new ConflictException("Cannot unset primary image");
+
+                // Set primary mới nếu cần
+                if (dto.IsPrimary.Value == true && !image.IsPrimary)
+                {
+                    // Unset primary cũ trước (nếu có)
+                    await _repo.UnsetPrimaryAsync(image.ProductId);
+                    image.IsPrimary = true;
+                }
+                // Nếu dto.IsPrimary == false và image không phải primary → không làm gì
             }
 
+            // Xử lý upload ảnh mới: upload trước, nếu thành công mới xóa ảnh cũ
             if (dto.Image != null)
             {
-                await _cloudinary.DeleteImageAsync(image.PublicId);
                 var upload = await _cloudinary.UploadImageAsync(dto.Image);
+                // Upload thành công, giờ mới xóa ảnh cũ
+                await _cloudinary.DeleteImageAsync(image.PublicId);
                 image.ImageUrl = upload.Url;
                 image.PublicId = upload.PublicId;
             }
 
-            image.AltText = dto.AltText ?? image.AltText;
+            // Xử lý AltText: chỉ update nếu có truyền vào
+            if (dto.AltText != null)
+            {
+                image.AltText = dto.AltText;
+            }
 
             await _repo.UpdateAsync(image);
 
@@ -105,21 +136,41 @@ namespace ShopNetApi.Services
 
 
         // ================= DELETE =================
-        public async Task DeleteAsync(long id)
+        public async Task DeleteAsync(long productId, long imageId)
         {
-            var image = await _repo.GetByIdAsync(id);
+            var image = await _repo.GetByIdAsync(imageId);
             if (image == null)
                 throw new NotFoundException("Product image not found");
 
+            // Validate image thuộc về product đúng
+            if (image.ProductId != productId)
+                throw new NotFoundException("Product image not found for this product");
+
+            // Kiểm tra số lượng ảnh còn lại
+            var allImages = await _repo.GetByProductIdAsync(productId);
+            var isLastImage = allImages.Count == 1;
+
+            // Nếu là primary image
             if (image.IsPrimary)
-                throw new ConflictException("Cannot delete primary image");
+            {
+                // Nếu là ảnh cuối cùng → cho phép xóa (sẽ không còn ảnh nào)
+                if (isLastImage)
+                {
+                    // OK, có thể xóa primary image cuối cùng
+                }
+                else
+                {
+                    // Không cho xóa primary nếu còn ảnh khác
+                    throw new ConflictException("Cannot delete primary image. Please set another image as primary first.");
+                }
+            }
 
             await _cloudinary.DeleteImageAsync(image.PublicId);
             await _repo.DeleteAsync(image);
 
             _logger.LogWarning(
-                "Product image deleted. ImageId={ImageId} | Email={Email}",
-                id, _currentUser.Email);
+                "Product image deleted. ImageId={ImageId}, WasPrimary={WasPrimary} | Email={Email}",
+                imageId, image.IsPrimary, _currentUser.Email);
         }
 
         // ================= GET =================

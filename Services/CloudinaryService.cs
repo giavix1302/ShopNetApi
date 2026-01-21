@@ -37,11 +37,8 @@ namespace ShopNetApi.Services
                 Folder = "products",
                 UseFilename = true,
                 UniqueFilename = true,
-                Overwrite = false,
-                Transformation = new Transformation()
-                    .Width(500)
-                    .Height(500)
-                    .Crop("fill")
+                Overwrite = false
+                // ❌ Không truyền Transformation
             };
 
             var result = await _cloudinary.UploadAsync(uploadParams);

@@ -40,7 +40,7 @@ namespace ShopNetApi.Controllers
             long imageId,
             [FromForm] UpdateProductImageDto dto)
         {
-            var result = await _service.UpdateAsync(imageId, dto);
+            var result = await _service.UpdateAsync(productId, imageId, dto);
 
             return Ok(ApiResponse<ProductImageResponseDto>.Ok(
                 "Product image updated successfully", result));
@@ -53,7 +53,7 @@ namespace ShopNetApi.Controllers
             long productId,
             long imageId)
         {
-            await _service.DeleteAsync(imageId);
+            await _service.DeleteAsync(productId, imageId);
 
             return Ok(ApiResponse<object>.Ok(
                 "Product image deleted successfully", null));

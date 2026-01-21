@@ -1,4 +1,6 @@
-﻿namespace ShopNetApi.DTOs.Product
+﻿using ShopNetApi.DTOs.ProductSpecification;
+
+namespace ShopNetApi.DTOs.Product
 {
     public class ProductResponseDto
     {
@@ -20,6 +22,7 @@
         public string? BrandName { get; set; }
 
         public List<ProductColorResponseDto> Colors { get; set; } = [];
+        public List<ProductSpecificationResponseDto> Specifications { get; set; } = [];
 
         public DateTime CreatedAt { get; set; }
     }
