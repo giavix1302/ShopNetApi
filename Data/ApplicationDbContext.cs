@@ -91,6 +91,54 @@ namespace ShopNetApi.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // ========= CART CONSTRAINT =========
+            modelBuilder.Entity<Cart>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.HasIndex(x => x.UserId)
+                    .IsUnique(); // Mỗi user chỉ có 1 cart
+
+                entity.HasOne(x => x.User)
+                    .WithOne(u => u.Cart)
+                    .HasForeignKey<Cart>(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ========= CART ITEM CONSTRAINT =========
+            modelBuilder.Entity<CartItem>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.UnitPrice)
+                    .IsRequired(); // Giá bắt buộc phải có
+
+                entity.Property(x => x.Quantity)
+                    .IsRequired();
+
+                // Cấm trùng sản phẩm cùng màu trong 1 cart
+                // Nếu muốn thêm lại, sẽ cộng dồn Quantity thay vì tạo mới
+                // Lưu ý: Với ColorId nullable, PostgreSQL cho phép nhiều NULL values
+                // Nếu cần strict unique (kể cả NULL), cần dùng partial index hoặc xử lý trong application logic
+                entity.HasIndex(x => new { x.CartId, x.ProductId, x.ColorId })
+                    .IsUnique();
+
+                entity.HasOne(x => x.Cart)
+                    .WithMany(c => c.Items)
+                    .HasForeignKey(x => x.CartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Product)
+                    .WithMany()
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Color)
+                    .WithMany()
+                    .HasForeignKey(x => x.ColorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             base.OnModelCreating(modelBuilder);
         }
     }

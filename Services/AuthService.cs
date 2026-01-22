@@ -21,6 +21,7 @@ namespace ShopNetApi.Services
         private readonly IRefreshTokenRepository _refreshTokenRepo;
         private readonly IOtpService _otpService;
         private readonly IEmailService _emailService;
+        private readonly ICartRepository _cartRepository;
         private readonly ILogger<AuthService> _logger;
 
         public AuthService(
@@ -31,6 +32,7 @@ namespace ShopNetApi.Services
             IRefreshTokenRepository refreshTokenRepo,
             IOtpService otpService,
             IEmailService emailService,
+            ICartRepository cartRepository,
             ILogger<AuthService> logger)
         {
             _userManager = userManager;
@@ -40,10 +42,11 @@ namespace ShopNetApi.Services
             _refreshTokenRepo = refreshTokenRepo;
             _otpService = otpService;
             _emailService = emailService;
+            _cartRepository = cartRepository;
             _logger = logger;
         }
 
-        public async Task<string> LoginAsync(LoginDto dto)
+        public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
         {
             _logger.LogInformation(
                 "Login attempt. Email={Email}", dto.Email);
@@ -72,7 +75,36 @@ namespace ShopNetApi.Services
             _logger.LogInformation(
                 "Login success. UserId={UserId}", user.Id);
 
-            return await SignInAsync(user);
+            // Đảm bảo user có cart (cho trường hợp user cũ chưa có cart)
+            var existingCart = await _cartRepository.GetByUserIdAsync(user.Id);
+            if (existingCart == null)
+            {
+                await _cartRepository.AddAsync(new Cart
+                {
+                    UserId = user.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+                _logger.LogInformation(
+                    "Cart created for existing user. UserId={UserId}", user.Id);
+            }
+
+            var accessToken = await SignInAsync(user);
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new LoginResponseDto
+            {
+                AccessToken = accessToken,
+                User = new UserResponseDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    FullName = user.FullName,
+                    Address = user.Address,
+                    AvatarUrl = user.AvatarUrl,
+                    Roles = roles.ToList(),
+                    CreatedAt = user.CreatedAt
+                }
+            };
         }
 
         // ================= REGISTER =================
@@ -87,7 +119,7 @@ namespace ShopNetApi.Services
 
                 throw new BadRequestException("Email đã tồn tại");
             }
-
+    
             var otp = await _otpService.GenerateAndStoreAsync(dto.Email, dto.FullName!);
 
             _logger.LogInformation(
@@ -130,8 +162,15 @@ namespace ShopNetApi.Services
 
             await _userManager.AddToRoleAsync(user, "User");
 
+            // Tạo cart trống cho user mới
+            await _cartRepository.AddAsync(new Cart
+            {
+                UserId = user.Id,
+                CreatedAt = DateTime.UtcNow
+            });
+
             _logger.LogInformation(
-                "User registered successfully. UserId={UserId}", user.Id);
+                "User registered successfully. UserId={UserId}, Cart created", user.Id);
 
             return await SignInAsync(user);
         }

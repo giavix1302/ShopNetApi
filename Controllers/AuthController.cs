@@ -22,12 +22,9 @@ namespace ShopNetApi.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
-            var token = await _authService.LoginAsync(dto);
+            var result = await _authService.LoginAsync(dto);
 
-            return Ok(ApiResponse<object>.Ok("Đăng nhập thành công", new
-            {
-                accessToken = token
-            }));
+            return Ok(ApiResponse<LoginResponseDto>.Ok("Đăng nhập thành công", result));
         }
 
         [AllowAnonymous]
