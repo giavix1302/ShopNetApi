@@ -212,6 +212,43 @@ namespace ShopNetApi.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // ========= REVIEW CONSTRAINT =========
+            modelBuilder.Entity<Review>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Rating)
+                    .IsRequired();
+
+                entity.Property(x => x.Comment)
+                    .HasMaxLength(1000);
+
+                entity.Property(x => x.CreatedAt)
+                    .IsRequired();
+
+                entity.Property(x => x.UpdatedAt)
+                    .IsRequired();
+
+                // Unique constraint: Mỗi user chỉ có thể review 1 product 1 lần
+                entity.HasIndex(x => new { x.UserId, x.ProductId })
+                    .IsUnique();
+
+                entity.HasOne(x => x.User)
+                    .WithMany(u => u.Reviews)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Product)
+                    .WithMany(p => p.Reviews)
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.OrderItem)
+                    .WithMany()
+                    .HasForeignKey(x => x.OrderItemId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             base.OnModelCreating(modelBuilder);
         }
     }

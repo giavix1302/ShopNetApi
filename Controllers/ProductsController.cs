@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Product;
+using ShopNetApi.DTOs.Review;
 using ShopNetApi.Services.Interfaces;
 
 namespace ShopNetApi.Controllers
@@ -11,10 +12,12 @@ namespace ShopNetApi.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IReviewService _reviewService;
 
-        public ProductsController(IProductService productService)
+        public ProductsController(IProductService productService, IReviewService reviewService)
         {
             _productService = productService;
+            _reviewService = reviewService;
         }
 
         [Authorize(Roles = "Admin")]
@@ -58,6 +61,22 @@ namespace ShopNetApi.Controllers
             var result = await _productService.GetByIdAsync(id);
             return Ok(ApiResponse<ProductResponseDto>.Ok(
                 "Get product successfully", result));
+        }
+
+        [HttpGet("{productId:long}/reviews")]
+        public async Task<IActionResult> GetProductReviews(long productId, [FromQuery] ReviewQueryDto query)
+        {
+            var result = await _reviewService.GetProductReviewsAsync(productId, query);
+            return Ok(ApiResponse<ReviewListPaginatedResponseDto>.Ok(
+                "Lấy danh sách review thành công", result));
+        }
+
+        [HttpGet("{productId:long}/reviews/stats")]
+        public async Task<IActionResult> GetProductReviewStats(long productId)
+        {
+            var result = await _reviewService.GetProductReviewStatsAsync(productId);
+            return Ok(ApiResponse<ReviewStatsResponseDto>.Ok(
+                "Lấy thống kê review thành công", result));
         }
     }
 }

@@ -153,6 +153,14 @@ namespace ShopNetApi.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
+            // Auto-update Order.Status when tracking status is DELIVERED
+            if (dto.Status == OrderStatus.DELIVERED && order.Status != OrderStatus.DELIVERED)
+            {
+                order.Status = OrderStatus.DELIVERED;
+                order.UpdatedAt = DateTime.UtcNow;
+                _db.Orders.Update(order);
+            }
+
             _db.OrderTrackings.Add(tracking);
             await _db.SaveChangesAsync();
             return tracking.Id;
@@ -167,9 +175,23 @@ namespace ShopNetApi.Services
             if (tracking.OrderId != orderId)
                 throw new BadRequestException("Tracking không thuộc đơn hàng này");
 
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == orderId);
+            if (order == null)
+                throw new NotFoundException("Đơn hàng không tồn tại");
+
             // Partial update: only update provided fields (null means \"not provided\")
             if (dto.Status.HasValue)
+            {
                 tracking.Status = dto.Status.Value;
+                
+                // Auto-update Order.Status when tracking status is DELIVERED
+                if (dto.Status.Value == OrderStatus.DELIVERED && order.Status != OrderStatus.DELIVERED)
+                {
+                    order.Status = OrderStatus.DELIVERED;
+                    order.UpdatedAt = DateTime.UtcNow;
+                    _db.Orders.Update(order);
+                }
+            }
 
             if (dto.Location != null)
                 tracking.Location = dto.Location;
