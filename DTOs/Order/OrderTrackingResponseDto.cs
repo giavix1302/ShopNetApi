@@ -1,23 +1,18 @@
-﻿namespace ShopNetApi.Models
+using ShopNetApi.Models;
+
+namespace ShopNetApi.DTOs.Order
 {
-    public class OrderTracking
+    public class OrderTrackingResponseDto
     {
         public long Id { get; set; }
-
-        public long OrderId { get; set; }
-        public Order Order { get; set; } = null!;
-
+        public OrderStatus Status { get; set; }
         public string? Location { get; set; }
         public string? Description { get; set; }
-
-        public OrderStatus Status { get; set; }
         public string? Note { get; set; }
-
         public string? TrackingNumber { get; set; }
         public string? ShippingPattern { get; set; }
-
         public DateTime? EstimatedDelivery { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

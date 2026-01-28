@@ -30,6 +30,8 @@ namespace ShopNetApi.Data
         {
             modelBuilder.HasPostgresEnum<UserRole>();
             modelBuilder.HasPostgresEnum<OrderStatus>();
+            modelBuilder.HasPostgresEnum<PaymentMethod>();
+            modelBuilder.HasPostgresEnum<PaymentStatus>();
 
             // ========= COLOR CONSTRAINT =========
             modelBuilder.Entity<Color>(entity =>
@@ -137,6 +139,77 @@ namespace ShopNetApi.Data
                     .WithMany()
                     .HasForeignKey(x => x.ColorId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========= ORDER CONSTRAINT =========
+            modelBuilder.Entity<Order>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.OrderNumber)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.HasIndex(x => x.OrderNumber)
+                    .IsUnique(); // ❌ cấm trùng OrderNumber
+
+                entity.Property(x => x.TotalAmount)
+                    .IsRequired()
+                    .HasPrecision(18, 2);
+
+                entity.HasOne(x => x.User)
+                    .WithMany(u => u.Orders)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========= ORDER ITEM CONSTRAINT =========
+            modelBuilder.Entity<OrderItem>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Quantity)
+                    .IsRequired();
+
+                entity.Property(x => x.UnitPrice)
+                    .IsRequired()
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.Subtotal)
+                    .IsRequired()
+                    .HasPrecision(18, 2);
+
+                entity.HasOne(x => x.Order)
+                    .WithMany(o => o.Items)
+                    .HasForeignKey(x => x.OrderId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.Product)
+                    .WithMany()
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict); // ❌ Không cho xóa Product nếu có OrderItem
+
+                entity.HasOne(x => x.Color)
+                    .WithMany()
+                    .HasForeignKey(x => x.ColorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========= ORDER TRACKING CONSTRAINT =========
+            modelBuilder.Entity<OrderTracking>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.TrackingNumber)
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.ShippingPattern)
+                    .HasMaxLength(100);
+
+                entity.HasOne(x => x.Order)
+                    .WithMany(o => o.Trackings)
+                    .HasForeignKey(x => x.OrderId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             base.OnModelCreating(modelBuilder);

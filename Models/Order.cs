@@ -13,7 +13,11 @@
         public OrderStatus Status { get; set; } = OrderStatus.PENDING;
 
         public string? ShippingAddress { get; set; }
+        public PaymentMethod? PaymentMethod { get; set; }
+        public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.PENDING;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
         public ICollection<OrderTracking> Trackings { get; set; } = new List<OrderTracking>();

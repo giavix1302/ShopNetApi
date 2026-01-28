@@ -10,8 +10,12 @@
         public long ProductId { get; set; }
         public Product Product { get; set; } = null!;
 
+        public long? ColorId { get; set; }
+        public Color? Color { get; set; }
+
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public decimal Subtotal { get; set; }
 
         public bool IsReviewed { get; set; } = false;
     }
