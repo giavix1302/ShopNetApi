@@ -72,6 +72,20 @@ namespace ShopNetApi.Controllers
             );
         }
 
+        [AllowAnonymous]
+        [HttpPost("refresh-admin")]
+        public async Task<IActionResult> RefreshAdmin(RefreshTokenDto dto)
+        {
+            var result = await _authService.RefreshAdminAsync(dto.RefreshToken);
+
+            if (result == null)
+                throw new UnauthorizedException("Invalid refresh token");
+
+            return Ok(
+                ApiResponse<RefreshResponseDto>.Ok("Refresh thành công", result)
+            );
+        }
+
         [Authorize]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()

@@ -88,12 +88,15 @@ namespace ShopNetApi.Services
                     "Cart created for existing user. UserId={UserId}", user.Id);
             }
 
-            var accessToken = await SignInAsync(user);
+            var (accessToken, refreshToken) = await SignInAsync(user);
             var roles = await _userManager.GetRolesAsync(user);
+
+            var isAdmin = roles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
 
             return new LoginResponseDto
             {
                 AccessToken = accessToken,
+                RefreshToken = isAdmin ? refreshToken : null,
                 User = new UserResponseDto
                 {
                     Id = user.Id,
@@ -172,11 +175,12 @@ namespace ShopNetApi.Services
             _logger.LogInformation(
                 "User registered successfully. UserId={UserId}, Cart created", user.Id);
 
-            return await SignInAsync(user);
+            var (accessToken, _) = await SignInAsync(user);
+            return accessToken;
         }
 
         // ================= SIGN IN =================
-        private async Task<string> SignInAsync(ApplicationUser user)
+        private async Task<(string accessToken, string refreshToken)> SignInAsync(ApplicationUser user, bool skipCookie = false)
         {
             var roles = await _userManager.GetRolesAsync(user);
 
@@ -223,11 +227,14 @@ namespace ShopNetApi.Services
 
             await _refreshTokenService.SaveAsync(refreshToken, user.Id, TimeSpan.FromDays(7));
 
-            SetCookie(refreshToken);
+            if (!skipCookie)
+            {
+                SetCookie(refreshToken);
+            }
 
             _logger.LogInformation("Refresh token generated and stored. UserId={UserId}", user.Id);
 
-            return accessToken;
+            return (accessToken, refreshToken);
         }
 
         private void SetCookie(string token)
@@ -278,7 +285,66 @@ namespace ShopNetApi.Services
             _logger.LogInformation(
                 "Refresh token success. UserId={UserId}", user.Id);
 
-            return await SignInAsync(user); // trả accessToken mới
+            var (accessToken, _) = await SignInAsync(user); // trả accessToken mới
+            return accessToken;
+        }
+
+        public async Task<RefreshResponseDto?> RefreshAdminAsync(string refreshToken)
+        {
+            var userId = await _refreshTokenService.ValidateAsync(refreshToken);
+            if (userId == null)
+            {
+                _logger.LogWarning("Admin refresh token validation failed");
+                return null;
+            }
+
+            var tokenEntity = await _refreshTokenRepo.GetLatestValidAsync(userId.Value);
+
+            if (tokenEntity == null)
+            {
+                _logger.LogWarning("Admin refresh token not found or revoked. UserId={UserId}", userId.Value);
+                return null;
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(refreshToken, tokenEntity.TokenHash))
+            {
+                _logger.LogWarning(
+                    "Admin refresh token hash mismatch. UserId={UserId}",
+                    userId.Value);
+
+                return null;
+            }
+
+            var user = userId.HasValue
+                ? await _userManager.FindByIdAsync(userId.Value.ToString())
+                : null;
+
+            if (user == null) return null;
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var isAdmin = roles.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+
+            if (!isAdmin)
+            {
+                _logger.LogWarning(
+                    "Refresh admin called by non-admin user. UserId={UserId}",
+                    userId.Value);
+                return null;
+            }
+
+            await _refreshTokenRepo.RevokeAsync(tokenEntity);
+
+            _logger.LogInformation(
+                "Admin refresh token success. UserId={UserId}", user.Id);
+
+            // Admin refresh không set cookie, chỉ trả về JSON
+            var (accessToken, newRefreshToken) = await SignInAsync(user, skipCookie: true);
+
+            return new RefreshResponseDto
+            {
+                AccessToken = accessToken,
+                RefreshToken = newRefreshToken
+            };
         }
 
         public async Task LogoutAsync(string refreshToken)

@@ -8,6 +8,7 @@ namespace ShopNetApi.Services.Interfaces
         Task RegisterAsync(RegisterDto dto);
         Task<string> VerifyRegisterOtpAsync(VerifyOtpDto dto);
         Task<string?> RefreshAsync(string refreshToken);
+        Task<RefreshResponseDto?> RefreshAdminAsync(string refreshToken);
         Task LogoutAsync(string refreshToken);
     }
 }
