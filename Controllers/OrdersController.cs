@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Order;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
             _orderService = orderService;
         }
 
+        [EnableRateLimiting("CreateOrderPolicy")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateOrderDto dto)
         {
@@ -26,6 +28,7 @@ namespace ShopNetApi.Controllers
                 "Tạo đơn hàng thành công", result));
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("me")]
         public async Task<IActionResult> GetMyOrders()
         {
@@ -34,6 +37,7 @@ namespace ShopNetApi.Controllers
                 "Lấy danh sách đơn hàng thành công", result));
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("me/{orderId:long}")]
         public async Task<IActionResult> GetMyOrderById(long orderId)
         {
@@ -42,6 +46,7 @@ namespace ShopNetApi.Controllers
                 "Lấy thông tin đơn hàng thành công", result));
         }
 
+        [EnableRateLimiting("CancelOrderPolicy")]
         [HttpPut("{orderId:long}/cancel")]
         public async Task<IActionResult> CancelOrder(long orderId)
         {
@@ -50,6 +55,7 @@ namespace ShopNetApi.Controllers
                 "Hủy đơn hàng thành công", null));
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("{orderId:long}/tracking")]
         public async Task<IActionResult> GetOrderTracking(long orderId)
         {

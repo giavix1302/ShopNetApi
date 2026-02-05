@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Cart;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
             _cartService = cartService;
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("me")]
         public async Task<IActionResult> GetMyCart()
         {
@@ -26,6 +28,7 @@ namespace ShopNetApi.Controllers
                 "Lấy giỏ hàng thành công", result));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpPost("items")]
         public async Task<IActionResult> AddItem([FromBody] AddCartItemDto dto)
         {
@@ -34,6 +37,7 @@ namespace ShopNetApi.Controllers
                 "Thêm sản phẩm vào giỏ hàng thành công", result));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpPut("items/{itemId:long}")]
         public async Task<IActionResult> UpdateItem(long itemId, [FromBody] UpdateCartItemDto dto)
         {
@@ -42,6 +46,7 @@ namespace ShopNetApi.Controllers
                 "Cập nhật sản phẩm trong giỏ hàng thành công", result));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpDelete("items/{itemId:long}")]
         public async Task<IActionResult> DeleteItem(long itemId)
         {
@@ -50,6 +55,7 @@ namespace ShopNetApi.Controllers
                 "Xóa sản phẩm khỏi giỏ hàng thành công", null));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpDelete("clear")]
         public async Task<IActionResult> ClearCart()
         {

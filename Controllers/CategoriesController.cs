@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Category;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpPost]
         public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryDto dto)
         {
@@ -29,6 +31,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpPut("{id:long}")]
         public async Task<IActionResult> UpdateCategory(
             long id,
@@ -42,6 +45,7 @@ namespace ShopNetApi.Controllers
             ));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetCategories()
         {
@@ -50,6 +54,7 @@ namespace ShopNetApi.Controllers
             return Ok(ApiResponse<List<CategoryResponseDto>>.Ok("Lấy danh sách loại thành công", result));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet("{id:long}")]
         public async Task<IActionResult> GetCategory(long id)
         {
@@ -58,6 +63,8 @@ namespace ShopNetApi.Controllers
             return Ok(ApiResponse<CategoryResponseDto>.Ok("Lấy chi tiết thành công", result));
         }
 
+        [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpDelete("{id:long}")]
         public async Task<IActionResult> DeleteCategory(long id)
         {

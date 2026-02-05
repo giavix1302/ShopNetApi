@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Order.Admin;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
             _adminOrderService = adminOrderService;
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] AdminOrderQueryDto query)
         {
@@ -26,6 +28,7 @@ namespace ShopNetApi.Controllers
                 "Lấy danh sách đơn hàng thành công", result));
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet("{orderId:long}")]
         public async Task<IActionResult> GetById(long orderId)
         {
@@ -34,6 +37,7 @@ namespace ShopNetApi.Controllers
                 "Lấy thông tin đơn hàng thành công", result));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpPut("{orderId:long}/status")]
         public async Task<IActionResult> UpdateStatus(long orderId, [FromBody] UpdateOrderStatusDto dto)
         {
@@ -42,6 +46,7 @@ namespace ShopNetApi.Controllers
                 "Cập nhật trạng thái đơn hàng thành công", null));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpPut("{orderId:long}/payment")]
         public async Task<IActionResult> UpdatePayment(long orderId, [FromBody] UpdateOrderPaymentDto dto)
         {
@@ -50,6 +55,7 @@ namespace ShopNetApi.Controllers
                 "Cập nhật thanh toán đơn hàng thành công", null));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpPost("{orderId:long}/tracking")]
         public async Task<IActionResult> AddTracking(long orderId, [FromBody] CreateOrderTrackingDto dto)
         {
@@ -58,6 +64,7 @@ namespace ShopNetApi.Controllers
                 "Thêm tracking thành công", new { id = trackingId }));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpPut("{orderId:long}/tracking/{trackingId:long}")]
         public async Task<IActionResult> UpdateTracking(long orderId, long trackingId, [FromBody] UpdateOrderTrackingDto dto)
         {
@@ -66,6 +73,7 @@ namespace ShopNetApi.Controllers
                 "Cập nhật tracking thành công", null));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpDelete("{orderId:long}/tracking/{trackingId:long}")]
         public async Task<IActionResult> DeleteTracking(long orderId, long trackingId)
         {
@@ -74,6 +82,7 @@ namespace ShopNetApi.Controllers
                 "Xóa tracking thành công", null));
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet("stats")]
         public async Task<IActionResult> GetStats([FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {

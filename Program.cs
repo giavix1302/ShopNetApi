@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -14,8 +15,10 @@ using ShopNetApi.Services;
 using ShopNetApi.Services.Interfaces;
 using ShopNetApi.Settings;
 using StackExchange.Redis;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,6 +81,289 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// ==========================================================
+// RATE LIMITING
+// ==========================================================
+builder.Services.AddRateLimiter(options =>
+{
+    // Global limiter: 200 requests/phút/IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 200,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+
+    // Format rate limit response - viết trực tiếp để IDE không xóa using
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        var response = ApiResponse<object>.Fail("Quá nhiều requests. Vui lòng thử lại sau.", null);
+        await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+    };
+
+    // Helper function để lấy partition key theo IP
+    Func<HttpContext, string> getIpPartitionKey = (context) =>
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    // Helper function để lấy partition key theo UserId
+    Func<HttpContext, string> getUserPartitionKey = (context) =>
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return userId ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    };
+
+    // Helper function để lấy partition key cho Admin
+    Func<HttpContext, string> getAdminPartitionKey = (context) =>
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = context.User.IsInRole("Admin");
+        return isAdmin ? $"admin_{userId}" : (userId ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+    };
+
+    // ============ AUTHENTICATION APIs (Sliding Window) ============
+
+    // Login - 5 requests/phút/IP (Sliding Window)
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Register - 3 requests/phút/IP (Sliding Window)
+    options.AddPolicy("RegisterPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Verify OTP - 10 requests/phút/IP (Sliding Window)
+    options.AddPolicy("VerifyOtpPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Refresh Token - 20 requests/phút/IP (Sliding Window)
+    options.AddPolicy("RefreshPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Refresh Admin - 30 requests/phút/User (Sliding Window)
+    options.AddPolicy("RefreshAdminPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Logout - 10 requests/phút/User (Sliding Window)
+    options.AddPolicy("LogoutPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // ============ WRITE OPERATIONS (Sliding Window) ============
+
+    // Create Order - 10 requests/phút/User (Sliding Window)
+    options.AddPolicy("CreateOrderPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Cancel Order - 5 requests/phút/User (Sliding Window)
+    options.AddPolicy("CancelOrderPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Create Review - 5 requests/phút/User (Sliding Window)
+    options.AddPolicy("CreateReviewPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Cart Operations - 30 requests/phút/User (Sliding Window)
+    options.AddPolicy("CartWritePolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // ============ ADMIN WRITE OPERATIONS (Sliding Window) ============
+
+    // Admin Product Operations - 20 requests/phút/Admin (Sliding Window)
+    options.AddPolicy("AdminProductPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getAdminPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Admin Order Operations - 30 requests/phút/Admin (Sliding Window)
+    options.AddPolicy("AdminOrderPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getAdminPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Admin Category/Brand/Color Operations - 15 requests/phút/Admin (Sliding Window)
+    options.AddPolicy("AdminCategoryPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getAdminPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 15,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Admin Image Operations - 20 requests/phút/Admin (Sliding Window)
+    options.AddPolicy("AdminImagePolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: getAdminPartitionKey(context),
+            factory: partition => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // ============ READ OPERATIONS (Fixed Window) ============
+
+    // Public Read - 100 requests/phút/IP (Fixed Window)
+    options.AddPolicy("PublicReadPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Authenticated Read - 60 requests/phút/User (Fixed Window)
+    options.AddPolicy("AuthenticatedReadPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: getUserPartitionKey(context),
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Admin Read - 100 requests/phút/Admin (Fixed Window)
+    options.AddPolicy("AdminReadPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: getAdminPartitionKey(context),
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Concurrency Limit - 10 requests đồng thời/IP
+    options.AddPolicy("ConcurrencyPolicy", context =>
+        RateLimitPartition.GetConcurrencyLimiter(
+            partitionKey: getIpPartitionKey(context),
+            factory: partition => new ConcurrencyLimiterOptions
+            {
+                PermitLimit = 10,
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+});
 
 // ==========================================================
 // 4. INFRASTRUCTURE (REDIS, SMTP, AUTOMAPPER, SWAGGER)
@@ -162,6 +448,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

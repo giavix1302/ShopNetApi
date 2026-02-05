@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Auth;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Exceptions;
@@ -19,6 +20,7 @@ namespace ShopNetApi.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("LoginPolicy")]
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
@@ -28,6 +30,7 @@ namespace ShopNetApi.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("RegisterPolicy")]
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
@@ -39,6 +42,7 @@ namespace ShopNetApi.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("VerifyOtpPolicy")]
         [HttpPost("verify-register-otp")]
         public async Task<IActionResult> VerifyRegisterOtp(VerifyOtpDto dto)
         {
@@ -51,6 +55,7 @@ namespace ShopNetApi.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("RefreshPolicy")]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh()
         {
@@ -73,6 +78,7 @@ namespace ShopNetApi.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting("RefreshAdminPolicy")]
         [HttpPost("refresh-admin")]
         public async Task<IActionResult> RefreshAdmin(RefreshTokenDto dto)
         {
@@ -87,6 +93,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize]
+        [EnableRateLimiting("LogoutPolicy")]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {

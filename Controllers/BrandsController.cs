@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Brand;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.Services.Interfaces;
@@ -17,6 +18,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpPost]
         public async Task<IActionResult> CreateBrand([FromBody] CreateBrandDto dto)
         {
@@ -29,6 +31,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpPut("{id:long}")]
         public async Task<IActionResult> UpdateBrand(long id, [FromBody] UpdateBrandDto dto)
         {
@@ -41,7 +44,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
-        // ========= DELETE =========
+        [EnableRateLimiting("AdminCategoryPolicy")]
         [HttpDelete("{id:long}")]
         public async Task<IActionResult> DeleteBrand(long id)
         {
@@ -53,7 +56,7 @@ namespace ShopNetApi.Controllers
             ));
         }
 
-        // ========= GET ALL =========
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetBrands()
         {
@@ -65,7 +68,7 @@ namespace ShopNetApi.Controllers
             ));
         }
 
-        // ========= GET DETAIL =========
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet("{id:long}")]
         public async Task<IActionResult> GetBrand(long id)
         {

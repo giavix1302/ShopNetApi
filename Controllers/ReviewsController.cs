@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Review;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
             _reviewService = reviewService;
         }
 
+        [EnableRateLimiting("CreateReviewPolicy")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateReviewDto dto)
         {
@@ -26,6 +28,7 @@ namespace ShopNetApi.Controllers
                 "Tạo review thành công", result));
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("me")]
         public async Task<IActionResult> GetMyReviews([FromQuery] ReviewQueryDto? query)
         {
@@ -34,6 +37,7 @@ namespace ShopNetApi.Controllers
                 "Lấy danh sách review thành công", result));
         }
 
+        [EnableRateLimiting("AuthenticatedReadPolicy")]
         [HttpGet("me/{reviewId:long}")]
         public async Task<IActionResult> GetMyReviewById(long reviewId)
         {
@@ -42,6 +46,7 @@ namespace ShopNetApi.Controllers
                 "Lấy thông tin review thành công", result));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpPut("{reviewId:long}")]
         public async Task<IActionResult> Update(long reviewId, [FromBody] UpdateReviewDto dto)
         {
@@ -50,6 +55,7 @@ namespace ShopNetApi.Controllers
                 "Cập nhật review thành công", result));
         }
 
+        [EnableRateLimiting("CartWritePolicy")]
         [HttpDelete("{reviewId:long}")]
         public async Task<IActionResult> Delete(long reviewId)
         {

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Product;
 using ShopNetApi.DTOs.Review;
@@ -21,6 +22,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminProductPolicy")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
         {
@@ -30,6 +32,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminProductPolicy")]
         [HttpPut("{id:long}")]
         public async Task<IActionResult> Update(long id, [FromBody] UpdateProductDto dto)
         {
@@ -39,6 +42,7 @@ namespace ShopNetApi.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminProductPolicy")]
         [HttpDelete("{id:long}")]
         public async Task<IActionResult> Delete(long id)
         {
@@ -47,6 +51,7 @@ namespace ShopNetApi.Controllers
                 "Product deleted successfully", null));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -55,6 +60,7 @@ namespace ShopNetApi.Controllers
                 "Get products successfully", result));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet("{id:long}")]
         public async Task<IActionResult> GetById(long id)
         {
@@ -63,6 +69,7 @@ namespace ShopNetApi.Controllers
                 "Get product successfully", result));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet("{productId:long}/reviews")]
         public async Task<IActionResult> GetProductReviews(long productId, [FromQuery] ReviewQueryDto query)
         {
@@ -71,6 +78,7 @@ namespace ShopNetApi.Controllers
                 "Lấy danh sách review thành công", result));
         }
 
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet("{productId:long}/reviews/stats")]
         public async Task<IActionResult> GetProductReviewStats(long productId)
         {

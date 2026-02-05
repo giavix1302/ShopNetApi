@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.ProductImage;
 using ShopNetApi.Services.Interfaces;
@@ -17,8 +18,8 @@ namespace ShopNetApi.Controllers
             _service = service;
         }
 
-        // ========= CREATE =========
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminImagePolicy")]
         [HttpPost]
         public async Task<IActionResult> Create(
             long productId,
@@ -32,8 +33,8 @@ namespace ShopNetApi.Controllers
                 "Product image created successfully", result));
         }
 
-        // ========= UPDATE =========
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminImagePolicy")]
         [HttpPut("{imageId:long}")]
         public async Task<IActionResult> Update(
             long productId,
@@ -46,8 +47,8 @@ namespace ShopNetApi.Controllers
                 "Product image updated successfully", result));
         }
 
-        // ========= DELETE =========
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("AdminImagePolicy")]
         [HttpDelete("{imageId:long}")]
         public async Task<IActionResult> Delete(
             long productId,
@@ -59,7 +60,7 @@ namespace ShopNetApi.Controllers
                 "Product image deleted successfully", null));
         }
 
-        // ========= GET ALL =========
+        [EnableRateLimiting("PublicReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetAll(long productId)
         {

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShopNetApi.DTOs.Common;
 using ShopNetApi.DTOs.Review.Admin;
 using ShopNetApi.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace ShopNetApi.Controllers
             _adminReviewService = adminReviewService;
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] AdminReviewQueryDto query)
         {
@@ -26,6 +28,7 @@ namespace ShopNetApi.Controllers
                 "Lấy danh sách review thành công", result));
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet("{reviewId:long}")]
         public async Task<IActionResult> GetById(long reviewId)
         {
@@ -34,6 +37,7 @@ namespace ShopNetApi.Controllers
                 "Lấy thông tin review thành công", result));
         }
 
+        [EnableRateLimiting("AdminOrderPolicy")]
         [HttpDelete("{reviewId:long}")]
         public async Task<IActionResult> Delete(long reviewId)
         {
@@ -42,6 +46,7 @@ namespace ShopNetApi.Controllers
                 "Xóa review thành công", null));
         }
 
+        [EnableRateLimiting("AdminReadPolicy")]
         [HttpGet("stats")]
         public async Task<IActionResult> GetStats([FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {
