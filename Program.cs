@@ -408,6 +408,7 @@ builder.Services.AddScoped<IColorRepository, ColorRepository>();
 builder.Services.AddScoped<ICartRepository, CartRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // Services
 builder.Services.AddScoped<IEmailService, EmailService>(); // Khuyên dùng Interface
@@ -426,6 +427,7 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IAdminReviewService, AdminReviewService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 
 
 // ==========================================================
